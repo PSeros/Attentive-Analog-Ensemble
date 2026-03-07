@@ -1,0 +1,46 @@
+{
+  "model_type": "CA2E",
+  "similarity_metric": "euclidean_distance",
+  "d_model": 32,
+  "n_blocks": 5,
+  "seq_len": 80,
+  "lookback": 17520,
+  "time_to_target": 2,
+  "d_vars": 2,
+  "foresight": 1,
+  "dropout": 0.3,
+  "max_locations": 82,
+  "d_loc": null,
+  "locations_kernel_size": null,
+  "epochs": 13,
+  "forecast_normalizer_mean": [
+    [
+      [
+        3.475944995880127,
+        3.5976061820983887
+      ]
+    ]
+  ],
+  "forecast_normalizer_variance": [
+    [
+      [
+        4.830358505249023,
+        4.07672643661499
+      ]
+    ]
+  ],
+  "observation_normalizer_mean": [
+    [
+      [
+        3.5972774028778076
+      ]
+    ]
+  ],
+  "observation_normalizer_variance": [
+    [
+      [
+        4.076521396636963
+      ]
+    ]
+  ]
+}

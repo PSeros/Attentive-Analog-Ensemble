@@ -1,0 +1,42 @@
+{
+  "model_type": "SA2E",
+  "similarity_metric": "cosine_similarity",
+  "d_model": 32,
+  "n_blocks": 5,
+  "seq_len": 80,
+  "lookback": 17520,
+  "time_to_target": 2,
+  "d_vars": 2,
+  "foresight": 1,
+  "dropout": 0.3,
+  "max_locations": null,
+  "d_loc": 6,
+  "locations_kernel_size": null,
+  "epochs": 55,
+  "forecast_normalizer_mean": [
+    [
+      [
+        3.6147236824035645,
+        3.741142988204956
+      ]
+    ]
+  ],
+  "forecast_normalizer_variance": [
+    [
+      [
+        4.7062788009643555,
+        3.6135458946228027
+      ]
+    ]
+  ],
+  "observation_normalizer_mean": [
+    [
+      4.148958206176758
+    ]
+  ],
+  "observation_normalizer_variance": [
+    [
+      4.077840805053711
+    ]
+  ]
+}

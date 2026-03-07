@@ -1,0 +1,38 @@
+{
+  "model_type": "A2E",
+  "similarity_metric": "euclidean_distance",
+  "d_model": 32,
+  "n_blocks": 5,
+  "seq_len": 80,
+  "lookback": 17520,
+  "time_to_target": 2,
+  "d_vars": 2,
+  "foresight": 1,
+  "dropout": 0.3,
+  "max_locations": null,
+  "d_loc": null,
+  "locations_kernel_size": null,
+  "epochs": 48,
+  "forecast_normalizer_mean": [
+    [
+      3.104032039642334,
+      3.485044002532959
+    ]
+  ],
+  "forecast_normalizer_variance": [
+    [
+      4.157339572906494,
+      3.2508113384246826
+    ]
+  ],
+  "observation_normalizer_mean": [
+    [
+      3.484611988067627
+    ]
+  ],
+  "observation_normalizer_variance": [
+    [
+      3.2511096000671387
+    ]
+  ]
+}
