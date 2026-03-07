@@ -221,4 +221,3 @@ _Attentive Analog Ensemble (A2E): End-To-End Learning of Analog Similarity by Op
 > Not published so far.
 
 - Add bibtex when published.
-- Use MIT Licence.
