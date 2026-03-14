@@ -165,6 +165,8 @@ The training API supports:
     import tensorflow as tf
     from A2E.io.config import ModelConfig
     from A2E.io.api import Api
+    from A2E.loss import SCRPS
+    from A2E.metrics.keras import CRPSMetric, EntropyMetric
 
     config = ModelConfig(
         # fill in your model configuration here
@@ -175,13 +177,13 @@ The training API supports:
     model, history = api.train(
         forecasts=forecasts,
         observations=observations,
-        optimizer=tf.keras.optimizers.Adam(),
-        loss=loss_fn,
-        epochs=epochs,
-        batch_size=batch_size,
+        save_path=save_path,
+        epochs=100,
+        batch_size=64,
         test_size=0.3,
-        save_path="models/a2e_model.keras",
-        metrics=metrics,
+        optimizer=tf.keras.optimizers.AdamW(),
+        loss=SCRPS(),
+        metrics=[CRPSMetrics(), EntropyMetric()],
     )
 
 > Note: adjust imports and configuration fields to match the exact implementation in the repository.
@@ -215,7 +217,7 @@ This repository is intended for researchers and practitioners interested in:
 
 If you use this repository in academic work, please cite the associated article:
 
-**Phillip Schlicht**  
+**Phillip Schlicht, Ralf Schemm**  
 _Attentive Analog Ensemble (A2E): End-To-End Learning of Analog Similarity by Optimizing Probabilistic Scoring Rules via Differentiable Retrieval_
 
 > Not published so far.
