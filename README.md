@@ -163,10 +163,10 @@ The training API supports:
 ### Example outline
 
     import tensorflow as tf
-    from A2E.io.config import ModelConfig
-    from A2E.io.api import Api
-    from A2E.loss import SCRPS
-    from A2E.metrics.keras import CRPSMetric, EntropyMetric
+    from a2e.io.config import ModelConfig
+    from a2e.io.api import Api
+    from a2e.loss import SCRPS
+    from a2e.metrics.keras import CRPSMetric, EntropyMetric
 
     config = ModelConfig(
         # fill in your model configuration here

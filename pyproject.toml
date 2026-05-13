@@ -1,0 +1,32 @@
+[project]
+name = "attentiveanalogensemble"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Phillip Schlicht", email = "schlicht@fh-aachen.de" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.10.9",
+    "scipy>=1.17.1",
+    "tensorflow==2.15.0",
+]
+
+[project.optional-dependencies]
+experiments = [
+    "numpy>=1.26.4",
+    "pandas>=2.3.3",
+    "scikit-learn>=1.8.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.6,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "a2e"
+
+[dependency-groups]
+dev = []
+
