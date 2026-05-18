@@ -1,8 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from experiments.data.data_loader import WindDataLoader
+
 # Load the data
+from .. import WindDataLoader
+
 loader = WindDataLoader()
 observations, forecasts = loader.get_all_data(
     obs_components=["total"],

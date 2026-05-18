@@ -4,9 +4,10 @@ import requests_cache
 from retry_requests import retry
 import re
 import numpy as np  # Added for trigonometric functions
+from ...project_paths import COORDINATES_CSV, wind_file
 
 # Read coordinates from CSV file
-coordinates = pd.read_csv('Data/Wind/coordinates.csv')
+coordinates = pd.read_csv(COORDINATES_CSV)
 
 # Extract names, latitudes and longitudes
 names = coordinates['Name'].tolist()
@@ -107,9 +108,9 @@ for type, url in url.items():
     v_component_pivot = sort_locations(v_component_pivot)
 
     # Save the pivoted and sorted DataFrames to CSV files
-    wind_speed_pivot.to_csv(f'Data/Wind/{output_prefix}_wind_speed.csv')
-    wind_direction_pivot.to_csv(f'Data/Wind/{output_prefix}_wind_direction.csv')
-    u_component_pivot.to_csv(f'Data/Wind/{output_prefix}_u_component.csv')
-    v_component_pivot.to_csv(f'Data/Wind/{output_prefix}_v_component.csv')
+    wind_speed_pivot.to_csv(wind_file(f'{output_prefix}_wind_speed.csv'))
+    wind_direction_pivot.to_csv(wind_file(f'{output_prefix}_wind_direction.csv'))
+    u_component_pivot.to_csv(wind_file(f'{output_prefix}_u_component.csv'))
+    v_component_pivot.to_csv(wind_file(f'{output_prefix}_v_component.csv'))
 
     print(f"\n{output_prefix.capitalize()} wind speed, direction, u component, and v component data have been saved to separate CSV files with time in rows and locations in columns, sorted by location.\n")

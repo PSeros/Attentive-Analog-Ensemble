@@ -2,7 +2,8 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
 import a2e
-from experiments.data.data_loader import WindDataLoader
+from ...data import WindDataLoader
+from ...project_paths import model_paths
 
 # Load Data
 loader = WindDataLoader()
@@ -40,9 +41,10 @@ locational_observations = locational_observations[idx:]
 
 # Name the model
 model_name = f"{config.model_type}_{config.similarity_metric}"
-directory = f"Trained_Models/{config.model_type}"
-save_path = f"{directory}/{model_name}.keras"
-os.makedirs(directory, exist_ok=True)
+paths = model_paths(config.model_type, model_name)
+directory = paths["directory"]
+save_path = str(paths["model"])
+directory.mkdir(parents=True, exist_ok=True)
 
 # a2e.utils.Wrapper is a High-Level wrapper for Training, Embedding and Retrieving
 api = a2e.io.Api(config=config)

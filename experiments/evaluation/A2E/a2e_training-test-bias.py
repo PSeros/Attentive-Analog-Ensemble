@@ -3,8 +3,9 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import pandas as pd
 import tensorflow as tf
-from experiments.data.data_loader import WindDataLoader
 import a2e
+from ...data import WindDataLoader
+from ...project_paths import *
 
 # Load Data
 loader = WindDataLoader()
@@ -30,9 +31,10 @@ for location in range(82):
     model_type = "A2E"
     similarity_metric = "cosine_similarity"
     model_name = f"{model_type}_{similarity_metric}_Location{location}"
-    directory = f"Trained_Models/{model_type}/Location{location}"
-    model_path = f"{directory}/{model_name}.keras"
-    config_path = f"{directory}/{model_name}_config.json"
+    paths = model_paths(model_type, model_name, location)
+    directory = paths["directory"]
+    model_path = paths["model"]
+    config_path = paths["config"]
 
     # Load Model Configs
     config = a2e.io.ModelConfig.load_from_json(config_path)
@@ -142,7 +144,7 @@ for location in range(82):
     print(f"  SCRPS (Uncorrected): {scrps_test_uncorrected_mean:.4f} | (Corrected): {scrps_test_corrected_mean:.4f}")
 
 # Save results
-output_path = f"Evaluation/{model_type}/{model_type.lower()}_bias_correction_comparison.csv"
+output_path = evaluation_file(model_type, f"{model_type.lower()}_bias_correction_comparison.csv")
 bias_comparison.to_csv(output_path, index=False)
 print(f"\nBias correction comparison complete. Results saved to {output_path}")
 

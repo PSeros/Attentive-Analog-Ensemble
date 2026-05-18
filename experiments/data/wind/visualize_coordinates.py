@@ -1,12 +1,13 @@
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
+from ...project_paths import COORDINATES_CSV, COORDINATES_PNG, GERMANY_SHP
 
 # Load Germany's shape
-germany = gpd.read_file('Data/Wind/germany_shape/de.shp')
+germany = gpd.read_file(GERMANY_SHP)
 
 # Load coordinates and location IDs
-coordinates = pd.read_csv('Data/Wind/coordinates.csv')
+coordinates = pd.read_csv(COORDINATES_CSV)
 latitudes = coordinates['Latitude']
 longitudes = coordinates['Longitude']
 
@@ -32,5 +33,5 @@ for loc_id, (lon, lat) in enumerate(zip(longitudes, latitudes)):
 ax.set_xlabel('Longitude')
 ax.set_ylabel('Latitude')
 ax.set_title('Coordinates with Location IDs')
-plt.savefig('Data/Wind/coordinates.png')
+plt.savefig(COORDINATES_PNG)
 plt.show()

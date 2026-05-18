@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import euclidean_distances
 import re
-import os
 from pathlib import Path
 
 class WindDataLoader:
@@ -15,7 +14,7 @@ class WindDataLoader:
         data_dir : str, optional
             The directory where the data files are stored (default is './wind/').
         """
-        self.data_dir = data_dir
+        self.data_dir = Path(data_dir)
         self.observation_data = None
         self.forecast_data = None
 
@@ -110,16 +109,17 @@ class WindDataLoader:
         else:
             raise ValueError(f"Unknown data type: {data_type}")
 
+        component_files = {
+            'u': f'{prefix}_u_component.csv',
+            'v': f'{prefix}_v_component.csv',
+            'total': f'{prefix}_wind_speed.csv',
+        }
+
         for comp in components:
-            if comp == 'u':
-                path = os.path.join(self.data_dir, f'{prefix}_u_component.csv')
-            elif comp == 'v':
-                path = os.path.join(self.data_dir, f'{prefix}_v_component.csv')
-            elif comp == 'total':
-                path = os.path.join(self.data_dir, f'{prefix}_wind_speed.csv')
-            else:
+            if comp not in component_files:
                 raise ValueError(f"Unknown component: {comp}")
 
+            path = self.data_dir / component_files[comp]
             df = pd.read_csv(path, index_col=0, parse_dates=True)
             df = self.sort_locations(df)
             result[comp] = df
@@ -135,10 +135,10 @@ class WindDataLoader:
         pandas.DataFrame
             A DataFrame containing the coordinates for each location.
         """
-        coordinates_path = os.path.join(self.data_dir, 'coordinates.csv')
+        coordinates_path = self.data_dir / 'coordinates.csv'
 
         # Check if the coordinates file exists
-        if not os.path.exists(coordinates_path):
+        if not coordinates_path.exists():
             raise FileNotFoundError(f"No coordinates file found at {coordinates_path}")
 
         # Load coordinates from file

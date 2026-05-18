@@ -2,8 +2,9 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from experiments.data.data_loader import WindDataLoader
 import a2e
+from ...data import WindDataLoader
+from ...project_paths import *
 
 # Load Data
 loader = WindDataLoader()
@@ -80,8 +81,8 @@ a2e.io.plotting.rank_histogram(
 
 plt.tight_layout()
 plot_type = "combined_rank-histogram"
-save_path = f"Trained_Models/{model_type}/combined_{plot_type}.png"
-os.makedirs(os.path.dirname(save_path), exist_ok=True)
+save_path = model_dir(model_type) / f"combined_{plot_type}.png"
+save_path.parent.mkdir(parents=True, exist_ok=True)
 plt.savefig(save_path, dpi=300)
 plt.show()
 plt.close()

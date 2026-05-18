@@ -2,10 +2,9 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from experiments.data.data_loader import WindDataLoader
 import a2e
-import warnings
-warnings.filterwarnings("ignore")
+from ...data import WindDataLoader
+from ...project_paths import *
 
 # Load Data
 loader = WindDataLoader()
@@ -23,9 +22,10 @@ for location in range(82):
     model_type = "SA2E"
     similarity_metric = "cosine_similarity"
     model_name = f"{model_type}_{similarity_metric}_Location{location}"
-    directory = f"Trained_Models/{model_type}/Location{location}"
-    model_path = f"{directory}/{model_name}.keras"
-    config_path = f"{directory}/{model_name}_config.json"
+    paths = model_paths(model_type, model_name, location)
+    directory = paths["directory"]
+    model_path = paths["model"]
+    config_path = paths["config"]
 
     # Load Model Configs
     print("\rSa2e...", end="", flush=True)
@@ -156,8 +156,8 @@ for location in range(82):
     print("\rSaving Comparison Plot...", end="", flush=True)
     plt.tight_layout()
     plot_type = "bias-rmse-crps-scrps"
-    save_path = f"{directory}/{model_name}_evaluation/{model_name}_{plot_type}-comparison.png"
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    save_path = paths["evaluation"] / f"{model_name}_{plot_type}-comparison.png"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_path, dpi=300)
     # plt.show()
     plt.close()
@@ -183,8 +183,8 @@ for location in range(82):
     )
     plt.tight_layout()
     plot_type = "rank-histogram"
-    save_path = f"{directory}/{model_name}_evaluation/{model_name}_{plot_type}-comparison.png"
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    save_path = paths["evaluation"] / f"{model_name}_{plot_type}-comparison.png"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_path, dpi=300)
     # plt.show()
     plt.close()
@@ -211,8 +211,8 @@ for location in range(82):
 
     plt.tight_layout()
     plot_type = "qq-plot"
-    save_path = f"{directory}/{model_name}_evaluation/{model_name}_{plot_type}-comparison.png"
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    save_path = paths["evaluation"] / f"{model_name}_{plot_type}-comparison.png"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_path, dpi=300)
     # plt.show()
     plt.close()

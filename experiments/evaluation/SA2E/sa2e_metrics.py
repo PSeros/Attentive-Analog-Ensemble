@@ -2,11 +2,12 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import pandas as pd
 import tensorflow as tf
-from experiments.data.data_loader import WindDataLoader
 import a2e
+from ...data import WindDataLoader
+from ...project_paths import *
 
 # Load the existing CSV
-csv_path = "Evaluation/metrics_evaluation.csv"
+csv_path = METRICS_EVALUATION_CSV
 df = pd.read_csv(csv_path, index_col=0, header=[0, 1])
 
 # Load Data
@@ -25,9 +26,10 @@ for location in range(82):
     model_type = "SA2E"
     similarity_metric = "cosine_similarity"
     model_name = f"{model_type}_{similarity_metric}_Location{location}"
-    directory = f"Trained_Models/{model_type}/Location{location}"
-    model_path = f"{directory}/{model_name}.keras"
-    config_path = f"{directory}/{model_name}_config.json"
+    paths = model_paths(model_type, model_name, location)
+    directory = paths["directory"]
+    model_path = paths["model"]
+    config_path = paths["config"]
 
     # Load Model Configs
     config = a2e.io.ModelConfig.load_from_json(config_path)

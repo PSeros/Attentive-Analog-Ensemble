@@ -3,8 +3,9 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from experiments.data.data_loader import WindDataLoader
 import a2e
+from ..data import WindDataLoader
+from ..project_paths import *
 
 # Load Data
 loader = WindDataLoader()
@@ -30,9 +31,10 @@ print("Loading A2E model...")
 a2e_model_type = "A2E"
 a2e_similarity_metric = "cosine_similarity"
 a2e_model_name = f"{a2e_model_type}_{a2e_similarity_metric}_Location{location}"
-a2e_directory = f"Trained_Models/{a2e_model_type}/Location{location}"
-a2e_model_path = f"{a2e_directory}/{a2e_model_name}.keras"
-a2e_config_path = f"{a2e_directory}/{a2e_model_name}_config.json"
+a2e_paths = model_paths(a2e_model_type, a2e_model_name, location)
+a2e_directory = a2e_paths["directory"]
+a2e_model_path = a2e_paths["model"]
+a2e_config_path = a2e_paths["config"]
 
 a2e_config = a2e.io.ModelConfig.load_from_json(a2e_config_path)
 a2e_api = a2e.io.Api(a2e_config)
@@ -64,9 +66,10 @@ a2e_ensemble, a2e_weights = a2e_api.retrieve(z_t_a2e, z_h_a2e, y_h_a2e, k=100)
 print("Loading CA2E model...")
 ca2e_model_type = "CA2E"
 ca2e_model_name = f"{ca2e_model_type}_{a2e_similarity_metric}"
-ca2e_directory = f"Trained_Models/{ca2e_model_type}"
-ca2e_model_path = f"{ca2e_directory}/{ca2e_model_name}.keras"
-ca2e_config_path = f"{ca2e_directory}/{ca2e_model_name}_config.json"
+ca2e_paths = model_paths(ca2e_model_type, ca2e_model_name)
+ca2e_directory = ca2e_paths["directory"]
+ca2e_model_path = ca2e_paths["model"]
+ca2e_config_path = ca2e_paths["config"]
 
 ca2e_config = a2e.io.ModelConfig.load_from_json(ca2e_config_path)
 ca2e_api = a2e.io.Api(ca2e_config)
@@ -89,9 +92,10 @@ ca2e_ensemble, ca2e_weights = ca2e_api.retrieve(z_t_ca2e, z_h_ca2e, y_h_ca2e, k=
 print("Loading SA2E model...")
 sa2e_model_type = "SA2E"
 sa2e_model_name = f"{sa2e_model_type}_{a2e_similarity_metric}_Location{location}"
-sa2e_directory = f"Trained_Models/{sa2e_model_type}/Location{location}"
-sa2e_model_path = f"{sa2e_directory}/{sa2e_model_name}.keras"
-sa2e_config_path = f"{sa2e_directory}/{sa2e_model_name}_config.json"
+sa2e_paths = model_paths(sa2e_model_type, sa2e_model_name, location)
+sa2e_directory = sa2e_paths["directory"]
+sa2e_model_path = sa2e_paths["model"]
+sa2e_config_path = sa2e_paths["config"]
 
 sa2e_config = a2e.io.ModelConfig.load_from_json(sa2e_config_path)
 sa2e_api = a2e.io.Api(sa2e_config)
@@ -216,9 +220,9 @@ ax[3].grid(True)
 plt.tight_layout()
 
 # Save the plot
-save_directory = f"Evaluation/figures"
-os.makedirs(save_directory, exist_ok=True)
-save_path = f"{save_directory}/all_models_comparison_location{location}.png"
+save_directory = FIGURES_DIR
+save_directory.mkdir(parents=True, exist_ok=True)
+save_path = save_directory / f"all_models_comparison_location{location}.png"
 plt.savefig(save_path, dpi=300)
 print(f"Plot saved to: {save_path}")
 

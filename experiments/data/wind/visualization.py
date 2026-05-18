@@ -1,4 +1,5 @@
 import matplotlib
+from ...project_paths import COORDINATES_CSV, GERMANY_SHP, OBSERVATIONS_WIND_DIRECTION_CSV, OBSERVATIONS_WIND_SPEED_CSV
 matplotlib.use('TkAgg')
 import pandas as pd
 import geopandas as gpd
@@ -39,7 +40,7 @@ def plot_wind_data_interactive(start_date, end_date, red_indices=None, blue_coun
         red_indices = []
     try:
         # Load Germany's shape
-        germany = gpd.read_file('Data/Wind/germany_shape/de.shp')
+        germany = gpd.read_file(GERMANY_SHP)
         print("Germany shapefile loaded successfully")
     except Exception as e:
         print(f"Error loading Germany shapefile: {e}")
@@ -47,7 +48,7 @@ def plot_wind_data_interactive(start_date, end_date, red_indices=None, blue_coun
 
     try:
         # Load coordinates and names
-        coordinates = pd.read_csv('Data/Wind/coordinates.csv')
+        coordinates = pd.read_csv(COORDINATES_CSV)
         names = coordinates['Name'].tolist()
         latitudes = coordinates['Latitude'].tolist()
         longitudes = coordinates['Longitude'].tolist()
@@ -77,8 +78,8 @@ def plot_wind_data_interactive(start_date, end_date, red_indices=None, blue_coun
 
     try:
         # Load wind data (using historical data)
-        wind_speed_df = pd.read_csv('Data/Wind/observations_wind_speed.csv', index_col=0, parse_dates=True)
-        wind_direction_df = pd.read_csv('Data/Wind/observations_wind_direction.csv', index_col=0, parse_dates=True)
+        wind_speed_df = pd.read_csv(OBSERVATIONS_WIND_SPEED_CSV, index_col=0, parse_dates=True)
+        wind_direction_df = pd.read_csv(OBSERVATIONS_WIND_DIRECTION_CSV, index_col=0, parse_dates=True)
         print(f"Wind data loaded: {len(wind_speed_df)} speed records, {len(wind_direction_df)} direction records")
     except Exception as e:
         print(f"Error loading wind data: {e}")

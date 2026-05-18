@@ -1,13 +1,13 @@
 import os
-
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import pandas as pd
 import tensorflow as tf
-from experiments.data.data_loader import WindDataLoader
 import a2e
+from ...data import WindDataLoader
+from ...project_paths import *
 
 # Load the existing CSV
-csv_path = "Evaluation/metrics_evaluation.csv"
+csv_path = METRICS_EVALUATION_CSV
 df = pd.read_csv(csv_path, index_col=0, header=[0, 1])
 
 # Load Data

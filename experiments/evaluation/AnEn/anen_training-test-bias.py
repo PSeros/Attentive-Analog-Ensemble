@@ -2,8 +2,9 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import pandas as pd
 import tensorflow as tf
-from experiments.data.data_loader import WindDataLoader
 import a2e
+from ...data import WindDataLoader
+from ...project_paths import *
 
 # Load Data
 loader = WindDataLoader()
@@ -141,7 +142,7 @@ for location in range(82):
     print(f"  SCRPS (Uncorrected): {scrps_test_uncorrected_mean:.4f} | (Corrected): {scrps_test_corrected_mean:.4f}")
 
 # Save results
-output_path = f"Evaluation/{model_type}/{model_type.lower()}_bias_correction_comparison.csv"
+output_path = evaluation_file(model_type, f"{model_type.lower()}_bias_correction_comparison.csv")
 bias_comparison.to_csv(output_path, index=False)
 print(f"\nBias correction comparison complete. Results saved to {output_path}")
 

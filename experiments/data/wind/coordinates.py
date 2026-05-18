@@ -4,6 +4,7 @@ import random
 from shapely.geometry import Point, MultiPolygon
 import csv
 from shapely.ops import unary_union
+from ...project_paths import COORDINATES_CSV, GERMANY_SHP
 
 def generate_equally_distributed_coordinates(polygon, num_coordinates):
     area = polygon.area
@@ -33,7 +34,7 @@ def generate_equally_distributed_coordinates(polygon, num_coordinates):
     return coordinates
 
 # Load Germany's boundaries from the shapefile
-germany = gpd.read_file('Data/Wind/germany_shape/de.shp')
+germany = gpd.read_file(GERMANY_SHP)
 germany_boundary = germany.geometry.union_all()
 if isinstance(germany_boundary, MultiPolygon):
     germany_boundary = unary_union(germany.geometry)
@@ -45,7 +46,7 @@ equally_distributed_coordinates = generate_equally_distributed_coordinates(germa
 location_names = [f"Location_{i}" for i in range(len(equally_distributed_coordinates))]
 
 # Save the coordinates and location names to a CSV file
-with open('Data/Wind/coordinates.csv', 'w', newline='') as file:
+with open(COORDINATES_CSV, 'w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['Name', 'Latitude', 'Longitude'])
     for i, coord in enumerate(equally_distributed_coordinates):

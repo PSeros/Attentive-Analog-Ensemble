@@ -1,15 +1,12 @@
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
-import sys
-from pathlib import Path
-
 import tensorflow as tf
 import a2e
 
+import sys
+from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
-
 from experiments.data.data_loader import WindDataLoader
 
 
