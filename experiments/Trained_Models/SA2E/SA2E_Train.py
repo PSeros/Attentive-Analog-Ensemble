@@ -59,7 +59,6 @@ for location, neighbours in enumerate(nearest_locations):
         epochs=100,
         test_size=0.3,
         batch_size=32,
-        accum_steps=2,
         optimizer=tf.keras.optimizers.AdamW(learning_rate=0.0001),
         loss=a2e.loss.SCRPS(),
         metrics=[a2e.metrics.keras.CRPSMetric(), a2e.metrics.keras.EntropyMetric()],
@@ -67,7 +66,7 @@ for location, neighbours in enumerate(nearest_locations):
             tf.keras.callbacks.ModelCheckpoint(save_path, save_best_only=True, monitor="val_loss", mode="min"),
             tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, min_delta=1e-4, mode="min",
                                              restore_best_weights=True),
-            tf.keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr if epoch < 5 else lr * tf.math.exp(-0.01)),
+            tf.keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr if epoch < 5 else float(lr * tf.math.exp(-0.01).numpy())),
         ],
     )
 exit()

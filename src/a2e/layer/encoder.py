@@ -1,5 +1,12 @@
 import tensorflow as tf
 
+
+def _encoded_time_steps(input_time_steps, seq_len):
+    if input_time_steps is None:
+        return None
+    return input_time_steps - seq_len + 1
+
+
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class DilatedConvLayer(tf.keras.layers.Layer):
     """
@@ -233,9 +240,9 @@ class WaveNet(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         if isinstance(input_shape, list):
-            return input_shape[0]
-        else:
-            return input_shape
+            input_shape = input_shape[0]
+        batch, time_steps, _ = input_shape
+        return (batch, _encoded_time_steps(time_steps, self.seq_len), self.d_model)
 
     def call(self, x, h=None, training=None):
         """
@@ -335,6 +342,12 @@ class Encoder(tf.keras.layers.Layer):
 
         if self.embedding:
             self.embedding.build((None,))
+
+    def compute_output_shape(self, input_shape):
+        if isinstance(input_shape, list):
+            input_shape = input_shape[0]
+        batch, time_steps, _ = input_shape
+        return (batch, _encoded_time_steps(time_steps, self.seq_len), self.d_model)
 
     def call(self, x, loc=None, training=None):
         """

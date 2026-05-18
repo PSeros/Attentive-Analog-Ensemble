@@ -22,7 +22,6 @@ class Api:
             epochs: int,
             batch_size: int,
             test_size: float,
-            accum_steps: int = 1,
             metrics: List[tf.keras.metrics.Metric] = None,
             callbacks: List[tf.keras.callbacks.Callback] = None,
             save_path: str = None
@@ -37,7 +36,6 @@ class Api:
             loss (tf.keras.losses.Loss): Loss function
             epochs (int): Number of epochs to train for
             batch_size (int): Number of samples per batch
-            accum_steps (int): Number of batches to accumulate during training before assigning gradients
             test_size (float): Fraction of data for testing
             metrics (tf.keras.metrics.Metric): List of metrics to track
             callbacks (tf.keras.callbacks.Callback): List of callbacks
@@ -49,7 +47,6 @@ class Api:
         # Convert to tf.Tensor
         forecasts = tf.cast(forecasts, dtype=tf.float32)
         observations = tf.cast(observations, dtype=tf.float32)
-        self._configure_gradient_accumulation(optimizer, accum_steps)
 
         # Check if model already exists and get user decision
         resume_training = False
@@ -400,14 +397,3 @@ class Api:
         if tensor.shape.rank and tensor.shape.rank > 1 and tensor.shape[0] == 1:
             tensor = tf.squeeze(tensor, axis=0)
         return tensor.numpy().tolist()
-
-    @staticmethod
-    def _configure_gradient_accumulation(optimizer, accum_steps: int) -> None:
-        if not accum_steps or accum_steps <= 1:
-            return
-        if not hasattr(optimizer, "gradient_accumulation_steps"):
-            raise ValueError(
-                "accum_steps requires a Keras 3 optimizer with "
-                "gradient_accumulation_steps support."
-            )
-        optimizer.gradient_accumulation_steps = accum_steps

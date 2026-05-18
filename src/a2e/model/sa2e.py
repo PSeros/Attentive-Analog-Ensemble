@@ -1,10 +1,9 @@
 import tensorflow as tf
-from a2e.model.base import BaseModel
 from a2e.layer.spatial_encoder import  SpatialEncoder
 from a2e.layer.cross_attention import CrossAttention
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
-class SA2E(BaseModel):
+class SA2E(tf.keras.Model):
     def __init__(
             self,
             seq_len: int,
@@ -94,6 +93,11 @@ class SA2E(BaseModel):
     def from_config(cls, config):
         """Create A2E instance from config"""
         return cls(**config)
+
+    def compute_output_shape(self, input_shape):
+        batch = input_shape[1][0]
+        output_steps = self.k if self.k else self.lookback - self.seq_len + 1
+        return (batch, output_steps, 2)
 
     def build(self, input_shape):
         _, self.lookback, d_loc, d_vars = input_shape[1]

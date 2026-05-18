@@ -1,5 +1,12 @@
 import tensorflow as tf
 
+
+def _encoded_time_steps(input_time_steps, seq_len):
+    if input_time_steps is None:
+        return None
+    return input_time_steps - seq_len + 1
+
+
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class PaddingLayer(tf.keras.layers.Layer):
     def __init__(self, dilation_rate, locations_kernel_size, **kwargs):
@@ -16,6 +23,14 @@ class PaddingLayer(tf.keras.layers.Layer):
         locations_pad = (self.locations_kernel_size - 1) // 2
         x_padded = tf.pad(x, [[0, 0], [self.dilation_rate, 0], [locations_pad, locations_pad], [0, 0]])
         return x_padded
+
+    def compute_output_shape(self, input_shape):
+        batch, time_steps, locations, channels = input_shape
+        if time_steps is not None:
+            time_steps += self.dilation_rate
+        if locations is not None:
+            locations += self.locations_kernel_size - 1
+        return (batch, time_steps, locations, channels)
 
     def get_config(self):
         config = super().get_config()
@@ -302,9 +317,9 @@ class SpatialWaveNet(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         if isinstance(input_shape, list):
-            return input_shape[0]
-        else:
-            return input_shape
+            input_shape = input_shape[0]
+        batch, time_steps, _, _ = input_shape
+        return (batch, _encoded_time_steps(time_steps, self.seq_len), self.d_model)
 
     def call(self, x, h=None, training=None):
         """
@@ -408,8 +423,10 @@ class SpatialEncoder(tf.keras.layers.Layer):
             self.embedding.build((None,))
 
     def compute_output_shape(self, input_shape):
-        _, _, d_loc, d_vars = input_shape
-        return (None, self.d_loc, self.d_model)
+        if isinstance(input_shape, list):
+            input_shape = input_shape[0]
+        batch, time_steps, _, _ = input_shape
+        return (batch, _encoded_time_steps(time_steps, self.seq_len), self.d_model)
 
     def call(self, x, loc=None, training=None):
         """
