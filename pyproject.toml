@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Phillip Schlicht", email = "schlicht@fh-aachen.de" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.9,<3.12"
 dependencies = [
     "matplotlib>=3.10.9",
     "scipy>=1.17.1",
@@ -29,4 +29,3 @@ module-name = "a2e"
 
 [dependency-groups]
 dev = []
-
