@@ -81,6 +81,7 @@ class CA2E(BaseModel):
             'max_locations': self.max_locations,
             'n_blocks': self.n_blocks,
             'similarity_metric': self.similarity_metric,
+            'k': self.k,
             'dropout': self.dropout,
         })
         return config
@@ -91,14 +92,12 @@ class CA2E(BaseModel):
         return cls(**config)
 
     def build(self, input_shape):
-        super().build(input_shape)
         _, _, d_vars = input_shape[1]
 
-        # Build encoder
-        self.encoder.build((None, None, d_vars))
-
-        # Build cross attention
-        self.cross_attention.build((
-            (None, 1, self.d_model),
-            (None, None, self.d_model)
-        ))
+        self.call([
+            tf.zeros((1, self.seq_len, d_vars)),
+            tf.zeros((1, self.lookback, d_vars)),
+            tf.zeros((1, self.lookback, 1)),
+            tf.zeros((1,), dtype=tf.int32),
+        ])
+        super().build(input_shape)

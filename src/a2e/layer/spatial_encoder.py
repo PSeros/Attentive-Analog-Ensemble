@@ -2,8 +2,8 @@ import tensorflow as tf
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class PaddingLayer(tf.keras.layers.Layer):
-    def __init__(self, dilation_rate, locations_kernel_size):
-        super().__init__()
+    def __init__(self, dilation_rate, locations_kernel_size, **kwargs):
+        super().__init__(**kwargs)
         self.dilation_rate = dilation_rate
         self.locations_kernel_size = locations_kernel_size
         assert locations_kernel_size % 2 == 1, "locations_kernel_size must be odd."
@@ -52,7 +52,7 @@ class SpatialDilatedConvLayer(tf.keras.layers.Layer):
         self.filter = filter
         self.seq_len = seq_len
         self.locations_kernel_size = locations_kernel_size
-        self.dropout = dropout
+        self.dropout_rate = dropout
 
         # Calculate dilated convolution layers
         kernel_size = 2
@@ -167,7 +167,7 @@ class SpatialDilatedConvLayer(tf.keras.layers.Layer):
             "filter": self.filter,
             "seq_len": self.seq_len,
             "locations_kernel_size": self.locations_kernel_size,
-            "dropout": self.dropout,
+            "dropout": self.dropout_rate,
         })
         return config
 

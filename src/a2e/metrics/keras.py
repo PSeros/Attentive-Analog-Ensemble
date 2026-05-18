@@ -11,11 +11,11 @@ class CRPSMetric(tf.keras.metrics.Mean):
         w = model_output[:, :, 1]
         y = target
 
-        if tf.rank(y) == 1:
+        if y.shape.rank == 1:
             y = tf.expand_dims(y, axis=-1)
 
         value = -compute_crps(x, w, y)
-        super().update_state(value)
+        super().update_state(value, sample_weight=sample_weight)
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class SCRPSMetric(tf.keras.metrics.Mean):
@@ -27,11 +27,16 @@ class SCRPSMetric(tf.keras.metrics.Mean):
         w = model_output[:, :, 1]
         y = target
 
-        if tf.rank(y) == 1:
+        if y.shape.rank == 1:
             y = tf.expand_dims(y, axis=-1)
 
         value = -compute_scrps(x, w, y, gamma=self.gamma)
-        super().update_state(value)
+        super().update_state(value, sample_weight=sample_weight)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"gamma": self.gamma})
+        return config
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class EntropyMetric(tf.keras.metrics.Mean):
@@ -43,7 +48,12 @@ class EntropyMetric(tf.keras.metrics.Mean):
     def update_state(self, target, model_output, sample_weight=None):
         W = model_output[:, :, 1]
         penalty = self.beta * compute_entropy(W, self.eps)
-        super().update_state(penalty)
+        super().update_state(penalty, sample_weight=sample_weight)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"beta": self.beta, "eps": self.eps})
+        return config
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class CrossEntropyMetric(tf.keras.metrics.Mean):
@@ -55,4 +65,9 @@ class CrossEntropyMetric(tf.keras.metrics.Mean):
     def update_state(self, target, model_output, sample_weight=None):
         W = model_output[:, :, 1]
         penalty = self.beta * compute_cross_entropy(W, self.eps)
-        super().update_state(penalty)
+        super().update_state(penalty, sample_weight=sample_weight)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"beta": self.beta, "eps": self.eps})
+        return config

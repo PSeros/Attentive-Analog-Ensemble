@@ -11,7 +11,7 @@ class CRPS(tf.keras.losses.Loss):
         w_h = model_output[:, :, 1]
         y_t = target
 
-        if tf.rank(y_t) == 1:
+        if y_t.shape.rank == 1:
             y_t = tf.expand_dims(y_t, axis=-1)
 
         loss = -compute_crps(y_h, w_h, y_t)
@@ -36,7 +36,7 @@ class SCRPS(tf.keras.losses.Loss):
         w_h = model_output[:, :, 1]
         y_t = target
 
-        if tf.rank(y_t) == 1:
+        if y_t.shape.rank == 1:
             y_t = tf.expand_dims(y_t, axis=-1)
 
         loss = -compute_scrps(y_h, w_h, y_t, gamma=self.gamma)
@@ -44,6 +44,7 @@ class SCRPS(tf.keras.losses.Loss):
 
     def get_config(self):
         config = super().get_config()
+        config.update({"gamma": self.gamma})
         return config
 
     @classmethod

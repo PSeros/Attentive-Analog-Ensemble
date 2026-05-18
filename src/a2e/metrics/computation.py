@@ -25,7 +25,7 @@ def _term2(x: tf.Tensor, w: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
 
 def compute_crps(x: tf.Tensor, w: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
     """Computes CRPS with non-uniform but normalized weights. In O(n log n)"""
-    if tf.rank(y) ==1:
+    if y.shape.rank == 1:
         y = tf.expand_dims(y, -1)
     t1 = _term1(x, w)
     t2 = _term2(x, w, y)
@@ -36,7 +36,7 @@ def compute_scrps(x: tf.Tensor, w: tf.Tensor, y: tf.Tensor, gamma: float=1e-8) -
     Computes scaled CRPS -> SCRPS (Bolin; Wallin (2022) "LOCAL SCALE INVARIANCE AND ROBUSTNESS OF PROPER SCORING RULES")
     with non-uniform but normalized weights. In O(n log n)
     """
-    if tf.rank(y) ==1:
+    if y.shape.rank == 1:
         y = tf.expand_dims(y, -1)
     gamma = tf.cast(gamma, tf.float32)
     t1 = tf.add(_term1(x, w), gamma) # gamma -> prevent from division/log of 0
@@ -65,7 +65,7 @@ def compute_bias(x: tf.Tensor, w: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
         Array of bias values, shape (n_samples,)
     """
     # Ensure broadcastable shape shape (n_samples, 1)
-    if tf.rank(y) == 1:
+    if y.shape.rank == 1:
         y = tf.expand_dims(y, axis=1)
     # Calculate ensemble mean
     expected_values = tf.reduce_sum(tf.multiply(x, w), axis=1, keepdims=True)
@@ -92,7 +92,7 @@ def compute_rmse(x: tf.Tensor, w: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
         Array of RMSE values, shape (n_samples,)
     """
     # Ensure broadcastable shape shape (n_samples, 1)
-    if tf.rank(y) == 1:
+    if y.shape.rank == 1:
         y = tf.expand_dims(y, axis=1)
     # Calculate squared errors
     squared_errors = tf.square(tf.subtract(x, y))
