@@ -1,5 +1,12 @@
 import tensorflow as tf
 
+
+def _encoded_time_steps(input_time_steps, seq_len):
+    if input_time_steps is None:
+        return None
+    return input_time_steps - seq_len + 1
+
+
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class DilatedConvLayer(tf.keras.layers.Layer):
     """
@@ -21,6 +28,7 @@ class DilatedConvLayer(tf.keras.layers.Layer):
         super().__init__(name=name, **kwargs)
         self.filter = filter
         self.seq_len = seq_len
+        self.dropout_rate = dropout
         kernel_size = 2
         _seq_len = tf.constant(self.seq_len, dtype=tf.float32)
         _kernel_size = tf.constant(kernel_size, dtype=tf.float32)
@@ -66,6 +74,19 @@ class DilatedConvLayer(tf.keras.layers.Layer):
         else:
             x = input_shape
         return x
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "filter": self.filter,
+            "seq_len": self.seq_len,
+            "dropout": self.dropout_rate,
+        })
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
 
     def call(self, x, h=None, training=None):
         """
@@ -197,7 +218,7 @@ class WaveNet(tf.keras.layers.Layer):
         self.d_model = d_model
         self.seq_len = seq_len
         self.n_blocks = n_blocks
-        self.dropout = dropout
+        self.dropout_rate = dropout
 
         # Key Components
         self.wave_net_blocks = [WaveNetBlock(
@@ -219,9 +240,9 @@ class WaveNet(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         if isinstance(input_shape, list):
-            return input_shape[0]
-        else:
-            return input_shape
+            input_shape = input_shape[0]
+        batch, time_steps, _ = input_shape
+        return (batch, _encoded_time_steps(time_steps, self.seq_len), self.d_model)
 
     def call(self, x, h=None, training=None):
         """
@@ -258,7 +279,7 @@ class WaveNet(tf.keras.layers.Layer):
             "d_model": self.d_model,
             "seq_len": self.seq_len,
             "n_blocks": self.n_blocks,
-            "dropout": self.dropout,
+            "dropout": self.dropout_rate,
         })
         return config
 
@@ -321,6 +342,12 @@ class Encoder(tf.keras.layers.Layer):
 
         if self.embedding:
             self.embedding.build((None,))
+
+    def compute_output_shape(self, input_shape):
+        if isinstance(input_shape, list):
+            input_shape = input_shape[0]
+        batch, time_steps, _ = input_shape
+        return (batch, _encoded_time_steps(time_steps, self.seq_len), self.d_model)
 
     def call(self, x, loc=None, training=None):
         """

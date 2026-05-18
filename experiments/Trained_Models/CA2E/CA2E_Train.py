@@ -54,7 +54,6 @@ api.train(
     save_path=save_path,
     epochs=100,
     batch_size=64,
-    accum_steps=1,
     test_size=0.3,
     optimizer=tf.keras.optimizers.AdamW(learning_rate=0.0001),
     loss=a2e.loss.SCRPS(),
@@ -63,7 +62,7 @@ api.train(
         tf.keras.callbacks.ModelCheckpoint(save_path, save_best_only=True, monitor="val_loss", mode="min"),
         tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, min_delta=1e-4, mode="min",
                                          restore_best_weights=True),
-        tf.keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr if epoch < 5 else lr * tf.math.exp(-0.01)),
+        tf.keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr if epoch < 5 else float(lr * tf.math.exp(-0.01).numpy())),
     ],
 )
 

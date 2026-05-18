@@ -18,6 +18,7 @@ class CrossAttention(tf.keras.layers.Layer):
         """
         super().__init__(name=name, *args, **kwargs)
         self.similarity_metric = similarity_metric
+        self.g_zero_init_value = g_zero_init
         self.g_zero_init = tf.cast(g_zero_init, tf.float32)
         self.g_zero = None
 
@@ -47,6 +48,20 @@ class CrossAttention(tf.keras.layers.Layer):
                 dtype=tf.float32
             )
 
+    def compute_output_shape(self, input_shape):
+        if (
+                isinstance(input_shape, (list, tuple))
+                and len(input_shape) == 3
+                and isinstance(input_shape[0], (list, tuple, tf.TensorShape))
+        ):
+            keys_shape = input_shape[1]
+            batch, key_steps, _ = keys_shape
+        else:
+            batch = input_shape[0]
+            key_steps = self.g_zero_init_value if self.g_zero_init_value is not None else input_shape[1]
+        output_shape = (batch, key_steps)
+        return output_shape, output_shape
+
     def call(self, query, keys, values, k=False):
         """
         Args:
@@ -69,3 +84,15 @@ class CrossAttention(tf.keras.layers.Layer):
         weights = tf.nn.softmax(similarity)                         # shape (batch, k)
 
         return values, weights
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "similarity_metric": self.similarity_metric,
+            "g_zero_init": self.g_zero_init_value,
+        })
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)

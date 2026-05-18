@@ -22,7 +22,6 @@ class Api:
             epochs: int,
             batch_size: int,
             test_size: float,
-            accum_steps: int = 1,
             metrics: List[tf.keras.metrics.Metric] = None,
             callbacks: List[tf.keras.callbacks.Callback] = None,
             save_path: str = None
@@ -37,7 +36,6 @@ class Api:
             loss (tf.keras.losses.Loss): Loss function
             epochs (int): Number of epochs to train for
             batch_size (int): Number of samples per batch
-            accum_steps (int): Number of batches to accumulate during training before assigning gradients
             test_size (float): Fraction of data for testing
             metrics (tf.keras.metrics.Metric): List of metrics to track
             callbacks (tf.keras.callbacks.Callback): List of callbacks
@@ -84,7 +82,7 @@ class Api:
 
         # Setup callbacks and execute training
         callbacks = self._setup_callbacks(save_path, current_epoch, callbacks)
-        self._execute_training(pipeline, epochs_to_train, accum_steps, callbacks)
+        self._execute_training(pipeline, epochs_to_train, callbacks)
 
         # Plot results and save model
         self._plot_and_save_results(save_path, current_epoch, target_epoch, resume_training, epochs_to_train)
@@ -112,7 +110,7 @@ class Api:
         forecasts = tf.cast(forecasts, dtype=tf.float16)
         # Validate input
         if model_path:
-            self.model = tf.keras.models.load_model(model_path)
+            self.model = tf.keras.models.load_model(model_path, compile=False)
             print(self.model.summary()) if verbose else None
         else:
             assert self.model, "No trained model. Use .train() first or provide save_path."
@@ -123,8 +121,8 @@ class Api:
 
         # Normalize data
         forecasts = tf.keras.layers.Normalization(
-            mean=self.config.forecast_normalizer_mean,
-            variance=self.config.forecast_normalizer_variance
+            mean=self._normalizer_value(self.config.forecast_normalizer_mean),
+            variance=self._normalizer_value(self.config.forecast_normalizer_variance)
         )(forecasts)
 
         # Apply the encoder
@@ -174,7 +172,7 @@ class Api:
 
         # If given model_path -> load model
         if model_path:
-            self.model = tf.keras.models.load_model(model_path)
+            self.model = tf.keras.models.load_model(model_path, compile=False)
             print(self.model.summary()) if verbose else None
         else:
             assert self.model, "No trained model. Use .train() first or provide save_path."
@@ -269,7 +267,7 @@ class Api:
                 print(f"model has been trained for {current_epoch} epochs")
 
             # Load model with custom objects
-            self.model = tf.keras.models.load_model(save_path, custom_objects=None)
+            self.model = tf.keras.models.load_model(save_path, compile=False)
 
             # Recompile with new optimizer and loss
             self.model.compile(optimizer=optimizer, loss=loss, metrics=metrics or [])
@@ -332,7 +330,7 @@ class Api:
 
         return callbacks
 
-    def _execute_training(self, pipeline, epochs_to_train: int, accum_steps: int,
+    def _execute_training(self, pipeline, epochs_to_train: int,
                           callbacks: List[tf.keras.callbacks.Callback]) -> None:
         """
         Execute the actual model training.
@@ -340,7 +338,6 @@ class Api:
         Args:
             pipeline: Training pipeline
             epochs_to_train: Number of epochs to train
-            accum_steps: Number of steps to accumulate gradient
             callbacks: List of callbacks
         """
         if epochs_to_train <= 0:
@@ -349,7 +346,6 @@ class Api:
             return
 
         self.training_history = self.model.fit(
-            accum_steps,
             pipeline.get_train_data(),
             steps_per_epoch=pipeline.get_train_steps(),
             validation_data=pipeline.get_test_data(),
@@ -384,7 +380,7 @@ class Api:
         plot_training_history(self.training_history, f"{model_name}{suffix}", save_path)
 
         # Save model and config
-        self.model.save(save_path, save_format="keras")
+        self.model.save(save_path)
 
         config_path = os.path.splitext(save_path)[0] + "_config.json"
         self.config.save_to_json(config_path)
@@ -392,3 +388,12 @@ class Api:
         print(f"\nmodel saved at: {os.path.abspath(save_path)}")
         print(f"Config saved at: {os.path.abspath(config_path)}")
         print(f"Total cumulative epochs trained: {self.config.epochs}")
+
+    @staticmethod
+    def _normalizer_value(value):
+        if value is None:
+            return None
+        tensor = tf.constant(value, dtype=tf.float32)
+        if tensor.shape.rank and tensor.shape.rank > 1 and tensor.shape[0] == 1:
+            tensor = tf.squeeze(tensor, axis=0)
+        return tensor.numpy().tolist()

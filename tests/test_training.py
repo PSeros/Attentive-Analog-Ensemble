@@ -14,8 +14,8 @@ config = a2e.io.ModelConfig(
     model_type="A2E",
     similarity_metric="cosine_similarity",
     d_model=32,
-    n_blocks=5,
-    seq_len=5*(2**4),
+    n_blocks=1,
+    seq_len=1*(2**4),
     lookback=160,
     foresight=1,
     time_to_target=2,
@@ -53,7 +53,7 @@ api.train(
     forecasts=locational_forecasts,
     observations=locational_observations,
     save_path=save_path,
-    epochs=100,
+    epochs=10,
     test_size=0.3,
     batch_size=64,
     optimizer=tf.keras.optimizers.AdamW(learning_rate=0.0001),
@@ -63,7 +63,7 @@ api.train(
         tf.keras.callbacks.ModelCheckpoint(save_path, save_best_only=True, monitor="val_loss", mode="min"),
         tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, min_delta=1e-4, mode="min",
                                             restore_best_weights=True),
-        tf.keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr if epoch < 5 else lr * tf.math.exp(-0.01)),
+        tf.keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr if epoch < 5 else float(lr * tf.math.exp(-0.01).numpy())),
     ],
 )
 

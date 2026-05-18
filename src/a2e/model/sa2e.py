@@ -1,10 +1,9 @@
 import tensorflow as tf
-from a2e.model.base import BaseModel
 from a2e.layer.spatial_encoder import  SpatialEncoder
 from a2e.layer.cross_attention import CrossAttention
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
-class SA2E(BaseModel):
+class SA2E(tf.keras.Model):
     def __init__(
             self,
             seq_len: int,
@@ -84,6 +83,7 @@ class SA2E(BaseModel):
             'd_loc': self.d_loc,
             'n_blocks': self.n_blocks,
             'similarity_metric': self.similarity_metric,
+            'k': self.k,
             'locations_kernel_size': self.locations_kernel_size,
             'dropout': self.dropout,
         })
@@ -94,15 +94,17 @@ class SA2E(BaseModel):
         """Create A2E instance from config"""
         return cls(**config)
 
+    def compute_output_shape(self, input_shape):
+        batch = input_shape[1][0]
+        output_steps = self.k if self.k else self.lookback - self.seq_len + 1
+        return (batch, output_steps, 2)
+
     def build(self, input_shape):
-        super().build(input_shape)
         _, self.lookback, d_loc, d_vars = input_shape[1]
 
-        # Build encoder for both current and historical data
-        self.encoder.build((None, None, d_loc, d_vars))
-
-        # Build cross attention
-        self.cross_attention.build((
-            (None, 1, self.d_model),
-            (None, None, self.d_model)
-        ))
+        self.call([
+            tf.zeros((1, self.seq_len, d_loc, d_vars)),
+            tf.zeros((1, self.lookback, d_loc, d_vars)),
+            tf.zeros((1, self.lookback, 1)),
+        ])
+        super().build(input_shape)

@@ -1,10 +1,9 @@
 import tensorflow as tf
-from a2e.model.base import BaseModel
 from a2e.layer.encoder import Encoder
 from a2e.layer.cross_attention import CrossAttention
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
-class CA2E(BaseModel):
+class CA2E(tf.keras.Model):
     def __init__(
             self,
             seq_len: int,
@@ -81,6 +80,7 @@ class CA2E(BaseModel):
             'max_locations': self.max_locations,
             'n_blocks': self.n_blocks,
             'similarity_metric': self.similarity_metric,
+            'k': self.k,
             'dropout': self.dropout,
         })
         return config
@@ -90,15 +90,18 @@ class CA2E(BaseModel):
         """Create CA2E instance from config"""
         return cls(**config)
 
+    def compute_output_shape(self, input_shape):
+        batch = input_shape[1][0]
+        output_steps = self.k if self.k else self.lookback - self.seq_len + 1
+        return (batch, output_steps, 2)
+
     def build(self, input_shape):
-        super().build(input_shape)
         _, _, d_vars = input_shape[1]
 
-        # Build encoder
-        self.encoder.build((None, None, d_vars))
-
-        # Build cross attention
-        self.cross_attention.build((
-            (None, 1, self.d_model),
-            (None, None, self.d_model)
-        ))
+        self.call([
+            tf.zeros((1, self.seq_len, d_vars)),
+            tf.zeros((1, self.lookback, d_vars)),
+            tf.zeros((1, self.lookback, 1)),
+            tf.zeros((1,), dtype=tf.int32),
+        ])
+        super().build(input_shape)

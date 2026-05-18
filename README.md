@@ -1,6 +1,6 @@
 # Attentive Analog Ensemble (A2E)
 
-Attentive Analog Ensemble (A2E) is a TensorFlow-based framework for probabilistic weather postprocessing. It rethinks the traditional Analog Ensemble (AnEn) by replacing hard analog retrieval with a differentiable cross-attention mechanism, enabling end-to-end learning of analog similarity directly from probabilistic scoring rules such as CRPS and SCRPS.
+Attentive Analog Ensemble (A2E) is a TensorFlow/Keras 3 framework for probabilistic weather postprocessing. It rethinks the traditional Analog Ensemble (AnEn) by replacing hard analog retrieval with a differentiable cross-attention mechanism, enabling end-to-end learning of analog similarity directly from probabilistic scoring rules such as CRPS and SCRPS.
 
 The framework includes three model variants:
 
@@ -162,31 +162,40 @@ The training API supports:
 
 ### Example outline
 
-    import tensorflow as tf
-    from a2e.io.config import ModelConfig
-    from a2e.io.api import Api
-    from a2e.loss import SCRPS
-    from a2e.metrics.keras import CRPSMetric, EntropyMetric
+```python
+import tensorflow as tf
 
-    config = ModelConfig(
-        # fill in your model configuration here
-    )
+from a2e.io.config import ModelConfig
+from a2e.io.api import Api
+from a2e.loss import SCRPS
+from a2e.metrics.keras import CRPSMetric, EntropyMetric
 
-    api = Api(config=config)
+config = ModelConfig(
+    model_type="A2E",
+    similarity_metric="cosine_similarity",
+    d_model=32,
+    n_blocks=5,
+    seq_len=16,
+    lookback=160,
+    foresight=1,
+    time_to_target=2,
+    d_vars=2,
+    dropout=0.3,
+)
 
-    model, history = api.train(
-        forecasts=forecasts,
-        observations=observations,
-        save_path=save_path,
-        epochs=100,
-        batch_size=64,
-        test_size=0.3,
-        optimizer=tf.keras.optimizers.AdamW(),
-        loss=SCRPS(),
-        metrics=[CRPSMetrics(), EntropyMetric()],
-    )
+api = Api(config=config)
 
-> Note: adjust imports and configuration fields to match the exact implementation in the repository.
+model, history = api.train(
+    forecasts=forecasts,
+    observations=observations,
+    save_path=save_path,
+    epochs=100,
+    batch_size=64,
+    test_size=0.3,
+    optimizer=tf.keras.optimizers.AdamW(),
+    loss=SCRPS(),
+)
+```
 
 ## Evaluation
 
