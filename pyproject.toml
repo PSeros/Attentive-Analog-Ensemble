@@ -19,6 +19,9 @@ experiments = [
     "pandas>=2.3.3",
     "scikit-learn>=1.8.0",
 ]
+gpu = [
+    "tensorflow[and-cuda]>=2.20.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.11.6,<0.12.0"]
