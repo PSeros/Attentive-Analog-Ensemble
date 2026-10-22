@@ -56,13 +56,14 @@ class FastA2E(tf.keras.Model):
         """Number of location embeddings of the encoder. None -> no conditional encoding for A2E"""
         return None
 
-    def call(self, inputs) -> tf.Tensor:
+    def call(self, inputs, training=None) -> tf.Tensor:
         """
         :param inputs:
             - [0] x_s: Tensor with forecast series (series, time, d_vars)
             - [1] y_s: Tensor with observation series (series, time, 1)
             - [2] idx: Tensor with indices into the encoded series (queries, 3):
                 [:, 0] series, [:, 1] encoded step of the query, [:, 2] encoded step of the first key
+        :param training: Enables dropout. Keras 3 fit() passes training=True only if call() accepts it.
         :return: Tensor for aligned-output:
             - [:, :, 0] y_h: Tensor with historical observations (queries, n_strided_keys) or (queries, k)
             - [:, :, 1] w_h: Tensor with historical weights (queries, n_strided_keys) or (queries, k)
@@ -71,10 +72,10 @@ class FastA2E(tf.keras.Model):
         idx = tf.cast(idx, tf.int32)
 
         # Encode every series once -> encoded step j holds the window ending at time step j + seq_len - 1
-        z_s = self.encoder(x_s)                     # shape (series, time-seq_len+1, d_model)
+        z_s = self.encoder(x_s, training=training)  # shape (series, time-seq_len+1, d_model)
 
         # Encode query windows separately -> own dropout mask per query
-        z_c = self.encoder(self._query_windows(x_s, idx))  # shape (queries, 1, d_model)
+        z_c = self.encoder(self._query_windows(x_s, idx), training=training)  # shape (queries, 1, d_model)
         return self._retrieve(z_c, z_s, y_s, idx)
 
     def _query_windows(self, x_s, idx) -> tf.Tensor:

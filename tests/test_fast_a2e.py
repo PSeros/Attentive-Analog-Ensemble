@@ -4,6 +4,9 @@ import tempfile
 import tensorflow as tf
 import a2e
 
+# Full float32 matmuls on GPUs, so the exactness checks hold to 1e-5
+tf.config.experimental.enable_tensor_float_32_execution(False)
+
 # Small A2E setup on random data of a single location (time, variable)
 tf.random.set_seed(0)
 n_time = 600

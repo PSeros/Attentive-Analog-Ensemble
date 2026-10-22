@@ -41,7 +41,7 @@ class FastCA2E(FastA2E):
         """Include location embedding"""
         return self.max_locations
 
-    def call(self, inputs) -> tf.Tensor:
+    def call(self, inputs, training=None) -> tf.Tensor:
         """
         :param inputs:
             - [0] x_s: Tensor with forecast series of all sites in this step (sites, time, d_vars)
@@ -49,16 +49,17 @@ class FastCA2E(FastA2E):
             - [2] loc: Vector with location IDs of the sites (sites)
             - [3] idx: Tensor with indices into the encoded series (queries, 3):
                 [:, 0] site within this step, [:, 1] encoded step of the query, [:, 2] encoded step of the first key
+        :param training: Enables dropout. Keras 3 fit() passes training=True only if call() accepts it.
         :return: Tensor for aligned-output (see FastA2E)
         """
         x_s, y_s, loc, idx = inputs
         idx = tf.cast(idx, tf.int32)
 
         # Encode every site once with location conditioning
-        z_s = self.encoder(x_s, loc=loc)            # shape (sites, time-seq_len+1, d_model)
+        z_s = self.encoder(x_s, loc=loc, training=training)  # shape (sites, time-seq_len+1, d_model)
 
         # Encode query windows separately with the location of their site -> own dropout mask per query
-        z_c = self.encoder(self._query_windows(x_s, idx), loc=tf.gather(loc, idx[:, 0]))
+        z_c = self.encoder(self._query_windows(x_s, idx), loc=tf.gather(loc, idx[:, 0]), training=training)
         return self._retrieve(z_c, z_s, y_s, idx)
 
     def get_config(self):
