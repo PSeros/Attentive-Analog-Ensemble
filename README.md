@@ -213,6 +213,15 @@ These metrics allow assessment of both probabilistic forecast quality and determ
 
 This repository uses [Weather data by Open-Meteo.com](https://open-meteo.com/).
 
+## Trained models
+
+The trained weights used in the paper were created with the Keras 2 version of the code and do not load with `main`.
+They are kept, together with code that loads them, at the tag `paper-models-v1` (branch `legacy-keras2-compat`):
+
+```bash
+git checkout paper-models-v1
+```
+
 ## Why this repository is useful
 
 This repository is intended for researchers and practitioners interested in:
