@@ -49,11 +49,11 @@ The query embedding attends to historical forecast embeddings. The resulting wei
 
 The base model for single-location probabilistic forecasting. It uses a Siamese encoder and a differentiable cross-attention retrieval layer.
 
+**FastA2E** trains the same model with "encode once, query many": every training step encodes the series once and gathers queries and keys from these shared embeddings, instead of re-encoding the lookback of every sample. With `key_stride=1` its output is identical to A2E; `key_stride=n` uses only every n-th historical step as key. **FastCA2E** does the same for CA2E, encoding the series of `sites_per_step` sites per step.
+
 ### CA2E
 
 Conditional A2E extends the embedding network with location embeddings, allowing a single model to generalize across multiple locations. This supports transfer learning across sites and makes it easier to add new locations later by learning only their latent representation.
-
-**FastCA2E** trains the same model with "encode once, query many": every training step encodes the full series of a few sites once and gathers queries and keys from these shared embeddings, instead of re-encoding the lookback of every sample. With `key_stride=1` its output is identical to CA2E; `key_stride=n` uses only every n-th historical step as key. `sites_per_step` sets how many site series are encoded per step.
 
 ### SA2E
 

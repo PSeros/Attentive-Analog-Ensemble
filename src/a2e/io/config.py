@@ -6,6 +6,7 @@ from typing import Optional, List, Literal
 ModelType = Literal[
     "MiniA2E",
     "A2E",
+    "FastA2E",
     "CA2E",
     "FastCA2E",
     "SA2E",
@@ -35,9 +36,9 @@ class ModelConfig:
     # CA2E specific parameters
     max_locations: Optional[int] = None
 
-    # FastCA2E specific parameters
+    # FastA2E / FastCA2E specific parameters
     key_stride: Optional[int] = None      # Use every n-th historical step as key
-    sites_per_step: Optional[int] = None  # Number of site series encoded per training step
+    sites_per_step: Optional[int] = None  # FastCA2E: number of site series encoded per training step
 
     # SA2E specific parameters
     d_loc: Optional[int] = None
