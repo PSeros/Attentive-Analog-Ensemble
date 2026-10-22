@@ -38,7 +38,21 @@ class BaseTrainingPipeline(ABC):
         self.o_normalizer = tf.keras.layers.Normalization()
 
     def _prepare_dataset(self) -> None:
-        """Create and adapt normalizers on training data."""
+        """Normalize data, create the dataset and split it into train and test datasets."""
+        full_f_norm, full_o_norm = self._normalize()
+
+        # Create sequential dataset
+        self.full_dataset = self._create_dataset(full_f_norm, full_o_norm)
+
+        # Split, batch and prefetch datasets
+        train_dataset = self.full_dataset.take(self.train_size).repeat()
+        self.train_dataset = train_dataset.batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
+
+        test_dataset = self.full_dataset.skip(self.train_size).repeat()
+        self.test_dataset = test_dataset.batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
+
+    def _normalize(self):
+        """Create and adapt normalizers on training data, store their parameters in config and normalize all data."""
         time_steps = self.forecasts.shape[0]
         idx = int(time_steps - tf.math.ceil(time_steps * self.test_size_fraction))
         f_train, f_test = tf.split(self.forecasts, [idx, -1])
@@ -57,16 +71,7 @@ class BaseTrainingPipeline(ABC):
         self.config.forecast_normalizer_variance = self.f_normalizer.variance.numpy().tolist()
         self.config.observation_normalizer_mean = self.o_normalizer.mean.numpy().tolist()
         self.config.observation_normalizer_variance = self.o_normalizer.variance.numpy().tolist()
-
-        # Create sequential dataset
-        self.full_dataset = self._create_dataset(full_f_norm, full_o_norm)
-
-        # Split, batch and prefetch datasets
-        train_dataset = self.full_dataset.take(self.train_size).repeat()
-        self.train_dataset = train_dataset.batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
-
-        test_dataset = self.full_dataset.skip(self.train_size).repeat()
-        self.test_dataset = test_dataset.batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
+        return full_f_norm, full_o_norm
 
     def get_train_data(self) -> tf.data.Dataset:
         """Get training dataset."""

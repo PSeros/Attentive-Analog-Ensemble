@@ -92,7 +92,8 @@ class Api:
     def embed(self, forecasts: tf.Tensor,
               model_path: str = None,
               config_path: str = None,
-              verbose: bool = True
+              verbose: bool = True,
+              loc: int = None
               ) -> tf.Tensor:
         """
         Api around the embedding network in trained models, transforming forecast sequences into embedding vectors.
@@ -102,6 +103,7 @@ class Api:
             model_path (str): Path to load a trained model from if no model is loaded (optional).
             config_path (str): Path to load a config from if no config is loaded (optional).
             verbose (bool): If False mutes print statements.
+            loc (int): Location ID for models with location embeddings (CA2E, FastCA2E) (optional).
 
         Returns:
             - embeddings (tf.Tensor): Embedded sequences with shape (batch, timesteps-seq_len+1, embedding dimension).
@@ -127,7 +129,9 @@ class Api:
 
         # Apply the encoder
         forecasts = tf.expand_dims(forecasts, 0) # (time, features) -> (1, time, features)
-        embeddings = self.model.encoder(forecasts) # (1, time, features) -> (1, time-seq_len+1, d_model)
+        if loc is not None:
+            loc = tf.constant([loc], dtype=tf.int32)
+        embeddings = self.model.encoder(forecasts, loc=loc) # (1, time, features) -> (1, time-seq_len+1, d_model)
         return tf.squeeze(embeddings, axis=0) # (1, time-seq_len+1, d_model) -> (time-seq_len+1, d_model)
 
     def retrieve(
@@ -394,6 +398,6 @@ class Api:
         if value is None:
             return None
         tensor = tf.constant(value, dtype=tf.float32)
-        if tensor.shape.rank and tensor.shape.rank > 1 and tensor.shape[0] == 1:
+        while tensor.shape.rank and tensor.shape.rank > 1 and tensor.shape[0] == 1:
             tensor = tf.squeeze(tensor, axis=0)
         return tensor.numpy().tolist()

@@ -53,6 +53,8 @@ The base model for single-location probabilistic forecasting. It uses a Siamese 
 
 Conditional A2E extends the embedding network with location embeddings, allowing a single model to generalize across multiple locations. This supports transfer learning across sites and makes it easier to add new locations later by learning only their latent representation.
 
+**FastCA2E** trains the same model with "encode once, query many": every training step encodes the full series of a few sites once and gathers queries and keys from these shared embeddings, instead of re-encoding the lookback of every sample. With `key_stride=1` its output is identical to CA2E; `key_stride=n` uses only every n-th historical step as key. `sites_per_step` sets how many site series are encoded per step.
+
 ### SA2E
 
 Spatial A2E extends the temporal encoder with spatial convolutions so that the latent state of one location can incorporate information from neighboring or jointly modeled locations.

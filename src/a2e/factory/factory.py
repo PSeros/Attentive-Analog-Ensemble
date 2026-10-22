@@ -5,15 +5,18 @@ from a2e.io.config import ModelConfig
 from a2e.model.mini_a2e import MiniA2E
 from a2e.pipeline.a2e import A2EPipeline
 from a2e.pipeline.ca2e import CA2EPipeline
+from a2e.pipeline.fast_ca2e import FastCA2EPipeline
 from a2e.pipeline.sa2e import SA2EPipeline
 from a2e.model.a2e import A2E
 from a2e.model.ca2e import CA2E
+from a2e.model.fast_ca2e import FastCA2E
 from a2e.model.sa2e import SA2E
 
 PIPELINE_DISTRIBUTION = {
     "MiniA2E": A2EPipeline,
     "A2E": A2EPipeline,
     "CA2E": CA2EPipeline,
+    "FastCA2E": FastCA2EPipeline,
     "SA2E": SA2EPipeline,
 }
 
@@ -21,6 +24,7 @@ MODEL_DISTRIBUTION = {
     "MiniA2E": MiniA2E,
     "A2E": A2E,
     "CA2E": CA2E,
+    "FastCA2E": FastCA2E,
     "SA2E": SA2E,
 }
 
@@ -42,6 +46,12 @@ INPUT_SHAPE_CONFIGS: Dict[str, Callable[[ModelConfig], List[tuple]]] = {
         (None, cfg.lookback, cfg.d_vars),             # historical forecasts
         (None, cfg.lookback, 1),                      # historical observations
         (None,)                                       # location
+    ],
+    "FastCA2E": lambda cfg: [
+        (None, None, cfg.d_vars),                     # forecast series per site
+        (None, None, 1),                              # observation series per site
+        (None,),                                      # location per site
+        (None, 3)                                     # query indices [site, query, first key]
     ],
     "SA2E": lambda cfg: [
         (None, cfg.seq_len, cfg.d_loc, cfg.d_vars),   # current forecasts
