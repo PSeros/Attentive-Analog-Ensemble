@@ -52,10 +52,14 @@ class FastCA2E(FastA2E):
         :return: Tensor for aligned-output (see FastA2E)
         """
         x_s, y_s, loc, idx = inputs
+        idx = tf.cast(idx, tf.int32)
 
         # Encode every site once with location conditioning
         z_s = self.encoder(x_s, loc=loc)            # shape (sites, time-seq_len+1, d_model)
-        return self._retrieve(z_s, y_s, idx)
+
+        # Encode query windows separately with the location of their site -> own dropout mask per query
+        z_c = self.encoder(self._query_windows(x_s, idx), loc=tf.gather(loc, idx[:, 0]))
+        return self._retrieve(z_c, z_s, y_s, idx)
 
     def get_config(self):
         """Extract FastCA2E model configuration"""

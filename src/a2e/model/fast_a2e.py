@@ -20,8 +20,9 @@ class FastA2E(tf.keras.Model):
     ):
         """
         A2E trained with "encode once, query many":
-        Instead of encoding the lookback of every sample separately, the full series is encoded once per step.
-        Queries and keys are rows of these shared embeddings, gathered by index.
+        Instead of encoding the lookback of every sample separately, the full series is encoded once per step and
+        keys are rows of these shared embeddings, gathered by index. Queries are encoded from their own windows, so
+        that each query gets its own dropout mask, independent of its keys, as in A2E.
         Uses the same layers as A2E, with key_stride=1 the output is identical to A2E for the same samples.
         """
         super().__init__(name=name, *args, **kwargs)
@@ -67,21 +68,25 @@ class FastA2E(tf.keras.Model):
             - [:, :, 1] w_h: Tensor with historical weights (queries, n_strided_keys) or (queries, k)
         """
         x_s, y_s, idx = inputs
+        idx = tf.cast(idx, tf.int32)
 
         # Encode every series once -> encoded step j holds the window ending at time step j + seq_len - 1
         z_s = self.encoder(x_s)                     # shape (series, time-seq_len+1, d_model)
-        return self._retrieve(z_s, y_s, idx)
 
-    def _retrieve(self, z_s, y_s, idx) -> tf.Tensor:
-        """Gathers queries, keys and values from the encoded series and applies the cross-attention."""
-        idx = tf.cast(idx, tf.int32)
+        # Encode query windows separately -> own dropout mask per query
+        z_c = self.encoder(self._query_windows(x_s, idx))  # shape (queries, 1, d_model)
+        return self._retrieve(z_c, z_s, y_s, idx)
 
+    def _query_windows(self, x_s, idx) -> tf.Tensor:
+        """Cuts the window of every query out of the series -> shape (queries, seq_len, d_vars)"""
+        steps = idx[:, 1:2] + tf.range(self.seq_len)
+        series = tf.broadcast_to(idx[:, :1], tf.shape(steps))
+        return tf.gather_nd(x_s, tf.stack([series, steps], axis=-1))
+
+    def _retrieve(self, z_c, z_s, y_s, idx) -> tf.Tensor:
+        """Gathers keys and values from the encoded series and applies the cross-attention to the queries."""
         # Align y_s with z_s (remove padded region)
         y_s = y_s[:, self.seq_len - 1:, 0]          # shape (series, time-seq_len+1)
-
-        # Gather queries
-        z_c = tf.gather_nd(z_s, idx[:, :2])         # shape (queries, d_model)
-        z_c = tf.expand_dims(z_c, axis=1)           # shape (queries, 1, d_model)
 
         # Gather keys and values of each query's lookback
         key_steps = idx[:, 2:3] + self.key_offsets  # shape (queries, n_strided_keys)
