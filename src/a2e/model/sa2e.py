@@ -45,12 +45,13 @@ class SA2E(tf.keras.Model):
         # Cross-Attention (g_zero_init is only applied for ["cosine_similarity", "pearson_correlation"])
         self.cross_attention = CrossAttention(similarity_metric, g_zero_init=lookback-seq_len+1, name="cross_attention")
 
-    def call(self, inputs) -> tf.Tensor:
+    def call(self, inputs, training=None) -> tf.Tensor:
         """
         :param inputs:
             - [0] x_c: Tensor with current forecasts  (batch, seq_len, locations,  d_vars)
             - [1] x_h: Tensor with historical forecasts (batch, lookback, locations, d_vars)
             - [2] y_h: Tensor with historical observations (batch, lookback, 1)
+        :param training: Enables dropout. Keras 3 fit() passes training=True only if call() accepts it.
         :return: Tensor for aligned-output:
             - [:, :, 0] Y_h: Tensor with historical observations (batch, lookback)
             - [:, :, 1] W_h: Tensor with historical weights (batch, lookback)
@@ -58,8 +59,8 @@ class SA2E(tf.keras.Model):
         x_c, x_h, y_h = inputs
 
         # Encode both current and historical data with siamese encoder
-        z_c = self.encoder(x_c)  # shape (batch, seq_len, d_model)
-        z_h = self.encoder(x_h)  # shape (batch, lookback, d_model)
+        z_c = self.encoder(x_c, training=training)  # shape (batch, seq_len, d_model)
+        z_h = self.encoder(x_h, training=training)  # shape (batch, lookback, d_model)
 
         # Align y_h (remove padded region)
         y_h = y_h[:, self.seq_len - 1:, 0]          # shape (batch, new_lookback)
