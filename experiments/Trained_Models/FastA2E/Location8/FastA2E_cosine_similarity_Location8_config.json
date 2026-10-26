@@ -1,0 +1,40 @@
+{
+  "model_type": "FastA2E",
+  "similarity_metric": "cosine_similarity",
+  "d_model": 32,
+  "n_blocks": 5,
+  "seq_len": 80,
+  "lookback": 17520,
+  "time_to_target": 2,
+  "d_vars": 2,
+  "foresight": 1,
+  "dropout": 0.3,
+  "max_locations": null,
+  "key_stride": 1,
+  "sites_per_step": null,
+  "d_loc": null,
+  "locations_kernel_size": null,
+  "epochs": 77,
+  "forecast_normalizer_mean": [
+    [
+      3.833477735519409,
+      4.149384498596191
+    ]
+  ],
+  "forecast_normalizer_variance": [
+    [
+      5.002093315124512,
+      4.077974319458008
+    ]
+  ],
+  "observation_normalizer_mean": [
+    [
+      4.148954391479492
+    ]
+  ],
+  "observation_normalizer_variance": [
+    [
+      4.077845096588135
+    ]
+  ]
+}
