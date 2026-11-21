@@ -34,22 +34,18 @@ class A2EPipeline(BaseTrainingPipeline):
             message="Observations must be 2D for A2E models"
         )
 
-    def _create_dataset(self, f_data, a_data) -> tf.data.Dataset:
-        """Creates an index-based sliding window dataset for training A2E."""
-        ds = tf.data.Dataset.range(tf.cast(self.num_samples, tf.int64)) # has to be tf.in64
+    def _extract_sample(self, f_data, a_data, i):
+        """Sliding window sample i for training A2E."""
+        i = tf.cast(i, tf.int32)
+        # Archive: the forecasts are shifted by `foresight` against the values, so that the window ending in
+        # row r carries a_data[r - foresight], the value at its target time (same convention as y_t below).
+        fs = self.config.foresight
+        x_h = f_data[i + fs: i + self.config.lookback + fs]
+        y_h = a_data[i: i + self.config.lookback]
 
-        def extract_sample(i):
-            i = tf.cast(i, tf.int32)
-            # Archive: the forecasts are shifted by `foresight` against the values, so that the window ending in
-            # row r carries a_data[r - foresight], the value at its target time (same convention as y_t below).
-            fs = self.config.foresight
-            x_h = f_data[i + fs: i + self.config.lookback + fs]
-            y_h = a_data[i: i + self.config.lookback]
+        start = i + self.config.lookback + self.config.time_to_target - self.config.seq_len
+        end = i + self.config.lookback + self.config.time_to_target
+        x_t = f_data[start + 1: end + 1]
 
-            start = i + self.config.lookback + self.config.time_to_target - self.config.seq_len
-            end = i + self.config.lookback + self.config.time_to_target
-            x_t = f_data[start + 1: end + 1]
-
-            y_t = a_data[end - self.config.foresight]
-            return (x_t, x_h, y_h), y_t
-        return ds.map(extract_sample, num_parallel_calls=tf.data.AUTOTUNE).prefetch(tf.data.AUTOTUNE)
+        y_t = a_data[end - self.config.foresight]
+        return (x_t, x_h, y_h), y_t

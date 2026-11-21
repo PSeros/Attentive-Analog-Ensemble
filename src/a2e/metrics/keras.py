@@ -1,5 +1,5 @@
 import tensorflow as tf
-from a2e.metrics.computation import compute_crps, compute_scrps, compute_entropy, compute_cross_entropy
+from a2e.metrics.computation import compute_crps, compute_scrps, compute_entropy, compute_cross_entropy, compute_ess
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class CRPSMetric(tf.keras.metrics.Mean):
@@ -44,6 +44,16 @@ class EntropyMetric(tf.keras.metrics.Mean):
         W = model_output[:, :, 1]
         penalty = self.beta * compute_entropy(W, self.eps)
         super().update_state(penalty)
+
+@tf.keras.utils.register_keras_serializable(package="A2E")
+class ESSMetric(tf.keras.metrics.Mean):
+    """Effective ensemble size 1 / sum_j w_j^2, mean over the samples."""
+    def __init__(self, name="ess", **kwargs):
+        super().__init__(name=name, **kwargs)
+
+    def update_state(self, target, model_output, sample_weight=None):
+        W = model_output[:, :, 1]
+        super().update_state(compute_ess(W))
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class CrossEntropyMetric(tf.keras.metrics.Mean):

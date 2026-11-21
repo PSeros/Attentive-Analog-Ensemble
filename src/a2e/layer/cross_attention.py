@@ -47,6 +47,23 @@ class CrossAttention(tf.keras.layers.Layer):
                 dtype=tf.float32
             )
 
+    def scores(self, query, keys):
+        """
+        Attention logits: similarity between query and keys, scaled by the learned temperature g
+        (cosine similarity, pearson correlation).
+
+        Args:
+            query: Query Tensor of shape (batch_size, 1, d_model)
+            keys: Key Tensor of shape (batch_size, lookback, d_model)
+
+        Returns:
+            similarity of shape (batch_size, lookback)
+        """
+        similarity = self.similarity_func(query, keys)              # shape (batch, lookback)
+        if self.similarity_metric in ["cosine_similarity", "pearson_correlation"]:
+            similarity = tf.multiply(similarity, self.g) # Scales the similarity
+        return similarity
+
     def call(self, query, keys, values, k=False):
         """
         Args:
@@ -57,10 +74,7 @@ class CrossAttention(tf.keras.layers.Layer):
         Returns:
             attention_scores: The computed attention-scores of shape (batch_size, lookback) or (batch_size, k)
         """
-        similarity = self.similarity_func(query, keys)              # shape (batch, lookback)
-
-        if self.similarity_metric in ["cosine_similarity", "pearson_correlation"]:
-            similarity = tf.multiply(similarity, self.g) # Scales the similarity
+        similarity = self.scores(query, keys)                       # shape (batch, lookback)
 
         if k:
             similarity, indices = tf.math.top_k(similarity, k=k)    # shape (batch, k)

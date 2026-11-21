@@ -45,37 +45,28 @@ class CA2EPipeline(BaseTrainingPipeline):
             message="Second dimension of observations must match number of max_locations"
         )
 
-    def _create_dataset(self, f_data, a_data) -> tf.data.Dataset:
+    def _extract_sample(self, f_data, a_data, sample):
         """
         CA2E uses the timesteps of multiple locations subsequently.
-        So we create two index-based Datasets 1. locations 2. time.
-        Sampling logic goes first over all locations before shifting to the next time step.
+        Sampling logic goes first over all locations before shifting to the next time step:
+        sample = i * max_locations + loc, i.e.
         loc=0, i=0; loc=1, i=0 ... loc=total_loc, i=0; loc=0, i=1; loc=1, i=1 ... loc=total_loc, i=sample_per_loc
         """
-        ds = tf.data.Dataset.range(tf.cast(self.num_samples_per_location, tf.int64))
-        ds = ds.flat_map(
-            lambda i: tf.data.Dataset
-            .range(tf.cast(self.config.max_locations, tf.int64))
-            .map(lambda loc: (i, loc))
-        )
+        sample = tf.cast(sample, tf.int32)
+        i = sample // self.config.max_locations
+        loc = sample % self.config.max_locations
 
-        def extract_sample(i, loc):
-            i = tf.cast(i, tf.int32)
-            loc = tf.cast(loc, tf.int32)
+        # Extract historical data: the forecasts are shifted by `foresight` against the values, so that the
+        # window ending in row r carries a_data[r - foresight], the value at its target time.
+        fs = self.config.foresight
+        X_h = f_data[i + fs: i + self.config.lookback + fs, loc]
+        Y_h = a_data[i: i + self.config.lookback, loc]
 
-            # Extract historical data: the forecasts are shifted by `foresight` against the values, so that the
-            # window ending in row r carries a_data[r - foresight], the value at its target time.
-            fs = self.config.foresight
-            X_h = f_data[i + fs: i + self.config.lookback + fs, loc]
-            Y_h = a_data[i: i + self.config.lookback, loc]
+        # Extract current sequence
+        start = i + self.config.lookback + self.config.time_to_target - self.config.seq_len
+        end = i + self.config.lookback + self.config.time_to_target
+        X_t = f_data[start + 1: end + 1, loc]
 
-            # Extract current sequence
-            start = i + self.config.lookback + self.config.time_to_target - self.config.seq_len
-            end = i + self.config.lookback + self.config.time_to_target
-            X_t = f_data[start + 1: end + 1, loc]
-
-            # Target
-            y_t = a_data[end - self.config.foresight, loc]
-            return (X_t, X_h, Y_h, loc), y_t
-
-        return ds.map(extract_sample, num_parallel_calls=tf.data.AUTOTUNE).prefetch(tf.data.AUTOTUNE)
+        # Target
+        y_t = a_data[end - self.config.foresight, loc]
+        return (X_t, X_h, Y_h, loc), y_t

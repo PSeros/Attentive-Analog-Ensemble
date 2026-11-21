@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 from abc import ABC, abstractmethod
 from a2e.io.config import ModelConfig
@@ -32,6 +33,8 @@ class BaseTrainingPipeline(ABC):
         self.train_dataset = None
         self.test_dataset = None
         self.full_dataset = None
+        self._f_norm = None
+        self._o_norm = None
 
         # Initialize Normalizer
         self.f_normalizer = tf.keras.layers.Normalization()
@@ -59,6 +62,7 @@ class BaseTrainingPipeline(ABC):
         self.config.observation_normalizer_variance = self.o_normalizer.variance.numpy().tolist()
 
         # Create sequential dataset
+        self._f_norm, self._o_norm = full_f_norm, full_o_norm
         self.full_dataset = self._create_dataset(full_f_norm, full_o_norm)
 
         # Split, batch and prefetch datasets
@@ -75,6 +79,18 @@ class BaseTrainingPipeline(ABC):
     def get_test_data(self) -> tf.data.Dataset:
         """Get test dataset."""
         return self.test_dataset
+
+    def get_probe_data(self, n: int):
+        """
+        One fixed batch of `n` training samples, evenly spaced over the training period (normalized like the
+        training data). Used to monitor attention weights and gradients during training.
+
+        Returns:
+            (inputs, targets) of one batch.
+        """
+        indices = np.unique(np.linspace(0, self.train_size - 1, n).round().astype(np.int64))
+        dataset = self._create_dataset(self._f_norm, self._o_norm, indices=indices)
+        return next(iter(dataset.batch(len(indices))))
 
     def get_train_steps(self) -> int:
         """Get the number of training steps per epoch."""
@@ -105,6 +121,18 @@ class BaseTrainingPipeline(ABC):
             message="Last dimension of observations must be 1"
         )
 
+    def _create_dataset(self, f_data, a_data, indices=None) -> tf.data.Dataset:
+        """Index-based dataset over all samples (sample order 0 ... num_samples-1) or over the given indices."""
+        if indices is None:
+            ds = tf.data.Dataset.range(tf.cast(self.num_samples, tf.int64))  # has to be tf.int64
+        else:
+            ds = tf.data.Dataset.from_tensor_slices(tf.constant(indices, dtype=tf.int64))
+        return ds.map(
+            lambda i: self._extract_sample(f_data, a_data, i),
+            num_parallel_calls=tf.data.AUTOTUNE
+        ).prefetch(tf.data.AUTOTUNE)
+
     @abstractmethod
-    def _create_dataset(self, f_data, o_data):
+    def _extract_sample(self, f_data, a_data, i):
+        """Returns (inputs, target) of sample i."""
         pass

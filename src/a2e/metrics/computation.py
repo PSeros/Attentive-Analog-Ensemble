@@ -146,6 +146,10 @@ def compute_entropy(w: tf.Tensor, eps: float=1e-8) -> tf.Tensor:
     wlog_w = tf.multiply(w, log_w)
     return -tf.reduce_sum(wlog_w, axis=-1)
 
+def compute_ess(w: tf.Tensor) -> tf.Tensor:
+    """Effective ensemble size 1 / sum_j w_j^2 of normalized weights, per sample."""
+    return tf.math.reciprocal(tf.reduce_sum(tf.square(w), axis=-1))
+
 def compute_cross_entropy(w: tf.Tensor, eps: float=1e-8) -> tf.Tensor:
     eps = tf.cast(eps, tf.float32)
     log_w = tf.math.log(tf.add(w, eps))
