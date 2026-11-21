@@ -1,4 +1,54 @@
+import warnings
 import tensorflow as tf
+
+
+def dilated_layers_per_block(seq_len, n_blocks, kernel_size=2):
+    """
+    Number of dilated causal convolutions per block, L = ceil(log_k(seq_len / n_blocks)).
+
+    Computed as the smallest L >= 0 with n_blocks * k^L >= seq_len (exact for integer inputs).
+    Examples: 80/5 -> 4, 76/5 -> 4, 4/2 -> 1, 3/2 -> 1.
+    """
+    num_layers = 0
+    while n_blocks * kernel_size ** num_layers < seq_len:
+        num_layers += 1
+    return num_layers
+
+
+def receptive_field(seq_len, n_blocks, kernel_size=2):
+    """
+    Receptive field of the (spatial) WaveNet encoder, RF = 1 + n_blocks * (k^L - 1).
+
+    Each block stacks L causal convolutions with kernel size k and dilation rates 1, k, ..., k^(L-1),
+    see `dilated_layers_per_block`. Examples: 80/5 -> 76, 76/5 -> 76, 3/2 -> 3.
+    """
+    num_layers = dilated_layers_per_block(seq_len, n_blocks, kernel_size)
+    return 1 + n_blocks * (kernel_size ** num_layers - 1)
+
+
+def warn_receptive_field(seq_len, n_blocks, kernel_size=2):
+    """UserWarning if the receptive field of the encoder differs from seq_len. Returns the receptive field."""
+    num_layers = dilated_layers_per_block(seq_len, n_blocks, kernel_size)
+    rf = receptive_field(seq_len, n_blocks, kernel_size)
+    if rf == seq_len:
+        return rf
+    rates = ", ".join(str(kernel_size ** i) for i in range(num_layers)) or "none"
+    convolutions = "convolution" if num_layers == 1 else "convolutions"
+    setup = (f"seq_len is set to {seq_len}, but n_blocks={n_blocks} with kernel_size={kernel_size} and "
+             f"{num_layers} dilated causal {convolutions} per block (dilation rates {rates}) give a receptive field "
+             f"of 1 + {n_blocks}·({kernel_size}^{num_layers} − 1) = {rf}.")
+    if rf < seq_len:
+        n = seq_len - rf
+        steps = "time step of each input window is" if n == 1 else "time steps of each input window are"
+        warnings.warn(f"{setup} The first {n} {steps} discarded; the effective seq_len is {rf}.",
+                      UserWarning, stacklevel=3)
+    else:
+        n = rf - seq_len
+        zeros = "zero" if n == 1 else "zeros"
+        warnings.warn(f"{setup} The current window is padded with {n} {zeros} at the start, the archive windows are "
+                      f"not: their embeddings use up to {rf} time steps.", UserWarning, stacklevel=3)
+    return rf
+
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class DilatedConvLayer(tf.keras.layers.Layer):
@@ -7,7 +57,7 @@ class DilatedConvLayer(tf.keras.layers.Layer):
     A Causal temporal dilated convolution for temporal data.
     Supports conditional processing similar to the conditional WaveNet.
     """
-    def __init__(self, filter, seq_len, dropout=.0, name=None, **kwargs):
+    def __init__(self, filter, seq_len, dropout=.0, num_layers=None, name=None, **kwargs):
         """
         Initializes a dilated convolutional layer for use in a WaveNet model. Using Gated Activation Units.
 
@@ -15,6 +65,7 @@ class DilatedConvLayer(tf.keras.layers.Layer):
             filter (int): The number of filters (output channels) for convolutional layers.
             seq_len (int): Length of the input sequence.
             dropout (float): Dropout rate for regularization.
+            num_layers (int, optional): Number of dilated causal convolutions. Defaults to ceil(log2(seq_len)).
             name (str, optional): Name of the layer. Defaults to None.
             **kwargs: Additional keyword arguments for parent class initialization.
         """
@@ -22,10 +73,9 @@ class DilatedConvLayer(tf.keras.layers.Layer):
         self.filter = filter
         self.seq_len = seq_len
         kernel_size = 2
-        _seq_len = tf.constant(self.seq_len, dtype=tf.float32)
-        _kernel_size = tf.constant(kernel_size, dtype=tf.float32)
-        _num_layers = tf.math.log(_seq_len) / tf.math.log(_kernel_size)
-        num_layers = int(tf.math.ceil(_num_layers))
+        if num_layers is None:
+            num_layers = dilated_layers_per_block(seq_len, 1, kernel_size)
+        self.num_layers = num_layers
 
         # Dilated causal convolution W
         self.W_f = tf.keras.Sequential([
@@ -107,7 +157,7 @@ class WaveNetBlock(tf.keras.layers.Layer):
     """
     WaveNet Block for WaveNet.
     """
-    def __init__(self, d_model, seq_len, dropout=.0, name=None, **kwargs):
+    def __init__(self, d_model, seq_len, dropout=.0, num_layers=None, name=None, **kwargs):
         """
         Initializes a block used in the WaveNet architecture.
         Consisting of a Dilated Convolution and a linear projection.
@@ -117,6 +167,7 @@ class WaveNetBlock(tf.keras.layers.Layer):
             d_model (int): Dimensionality of the model, corresponding to the number of filters.
             seq_len (int): Length of the input sequence.
             dropout (float, optional): Dropout rate for regularization. Defaults to 0.
+            num_layers (int, optional): Number of dilated causal convolutions. Defaults to ceil(log2(seq_len)).
             name (str, optional): Name of the layer. Defaults to None.
             **kwargs: Additional keyword arguments for parent class initialization.
         """
@@ -129,7 +180,9 @@ class WaveNetBlock(tf.keras.layers.Layer):
             filter=d_model,
             seq_len=seq_len,
             dropout=dropout,
+            num_layers=num_layers,
         )
+        self.num_layers = self.dilated_conv.num_layers
         self.dense = tf.keras.layers.Dense(d_model)
 
     def build(self, input_shape):
@@ -170,6 +223,7 @@ class WaveNetBlock(tf.keras.layers.Layer):
             "d_model": self.d_model,
             "seq_len": self.seq_len,
             "dropout": self.dropout,
+            "num_layers": self.num_layers,
         })
         return config
 
@@ -199,11 +253,16 @@ class WaveNet(tf.keras.layers.Layer):
         self.n_blocks = n_blocks
         self.dropout = dropout
 
+        # Dilated causal convolutions per block: L = ceil(log2(seq_len / n_blocks)), receptive field 1 + n_blocks*(2^L-1)
+        num_layers = dilated_layers_per_block(seq_len, n_blocks)
+        self.receptive_field = warn_receptive_field(seq_len, n_blocks)
+
         # Key Components
         self.wave_net_blocks = [WaveNetBlock(
             d_model=d_model,
             seq_len=seq_len//n_blocks,
             dropout=dropout,
+            num_layers=num_layers,
         ) for _ in range(n_blocks)]
         self.dense1 = tf.keras.layers.Dense(d_model, activation="relu")
         self.dense2 = tf.keras.layers.Dense(d_model, activation=None)
