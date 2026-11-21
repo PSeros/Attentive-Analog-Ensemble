@@ -1,90 +1,37 @@
-import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-import pandas as pd
-import tensorflow as tf
-import a2e
-from ...data import WindDataLoader
-from ...project_paths import *
+"""
+Evaluation of the Analog Ensemble (Table 2): predictors x_{t-1}, x_t, x_{t+1} and y_{t-4}, y_{t-3}, y_{t-2}.
 
-# Load the existing CSV
-csv_path = METRICS_EVALUATION_CSV
-df = pd.read_csv(csv_path, index_col=0, header=[0, 1])
+Validation period (3720 samples per location) with a static archive of all earlier windows whose value is known at
+the issue time of the first sample (a2e.io.evaluation_split).
+Ensemble: k = 100 analogs of the window t ± 1, predictor weights 1, uniform member weights.
+Scores: bias, RMSE of the ensemble mean, CRPS, SCRPS (m/s); per sample also the randomized PIT.
+
+Run from the repository root:
+    .venv/bin/python -m experiments.evaluation.AnEn.anen_metrics            # all locations
+    .venv/bin/python -m experiments.evaluation.AnEn.anen_metrics 0 41       # locations 0 ... 40 (end exclusive)
+
+Results:
+    evaluation/metrics_evaluation.csv (Model AnEn)
+    evaluation/AnEn/per_sample/AnEn_Location{i}.npz
+"""
+
+from ..common import Data, anen_ensemble, location_range, scores, summary, save_per_sample, write_metrics, print_summary
+from ...project_paths import METRICS_EVALUATION_CSV
 
 # Load Data
-loader = WindDataLoader()
-observations, forecasts = loader.get_all_data(
-    obs_components=["total"],
-    fcst_components=["total"]
-)
-observations = tf.cast(observations, dtype=tf.float32)
-forecasts = tf.cast(forecasts, dtype=tf.float32)
+data = Data()
 
-# Evaluate all locations (change range to 82 for all locations)
-for location in range(82):
-    print(f"Evaluating Location {location}")
-    # Add observation as causal feature
-    foresight = 1
-    time_to_target = 2
-    idx = foresight + time_to_target
+results = {}
+for location in location_range(data.n_locations):
+    # Split (same queries and archive end as A2E) and AnEn ensemble
+    ensemble = anen_ensemble(data, location, observation_inputs=True)
 
-    # Set up Data [time, location, variable]
-    locational_observations=observations[:,location,:]
-    locational_forecasts=forecasts[:,location,:]
+    # Metrics, per-sample output
+    sample_scores = scores(ensemble, pit_seed=location)
+    save_per_sample("AnEn", f"AnEn_Location{location}", data, ensemble, sample_scores)
+    results[location] = summary(sample_scores)
+    print(f"Location {location} - " + ", ".join(f"{m}: {v:.4f}" for m, v in results[location].items()))
 
-    locational_forecasts = tf.concat([locational_forecasts[idx:], locational_observations[:-idx]], axis=-1)
-    locational_observations = locational_observations[idx:, :1]
-
-    # Set indices (-2 -> to get the number of ensembles!)
-    test_size = int((forecasts.shape[0] - 8760 * 2) * 0.3) - 2
-    t_start = -test_size - foresight if foresight else -test_size
-    t_end = -foresight if foresight else None
-
-    # Set up evaluation data (feature 0 -> total wind-speed)
-    y_t = locational_observations[t_start:t_end, 0]  # Observation of time t
-
-    # Create AnEn Model
-    model_type = "AnEn"
-    AnEn = a2e.model.AnEn(
-        n_analogs=100,
-        temporal_window=foresight
-    )
-    anen_inputs = [
-        locational_forecasts[-(test_size+2):], # +2 to produce test_size many ensembles
-        locational_forecasts[:-test_size],
-        locational_observations[:-test_size]
-    ]
-    AnEn.build((anen_inputs[0].shape, anen_inputs[1].shape, anen_inputs[2].shape))
-
-    # Retrieve top-k AnEn ensemble
-    ensemble = AnEn(anen_inputs)
-    weights = tf.ones(ensemble.shape)/ensemble.shape[-1]
-
-    # Compute metrics
-    bias = a2e.metrics.computation.compute_bias(ensemble, weights, y_t)
-    rmse = a2e.metrics.computation.compute_rmse(ensemble, weights, y_t)
-    crps = -a2e.metrics.computation.compute_crps(ensemble, weights, y_t)
-    scrps = -a2e.metrics.computation.compute_scrps(ensemble, weights, y_t)
-
-    # Compute mean
-    bias = tf.reduce_mean(bias).numpy()
-    rmse = tf.reduce_mean(rmse).numpy()
-    crps = tf.reduce_mean(crps).numpy()
-    scrps = tf.reduce_mean(scrps).numpy()
-
-    # Update DataFrame
-    location_idx = f"Location_{location}"
-    df.loc[location_idx, ("Bias", model_type)] = bias
-    df.loc[location_idx, ("RMSE", model_type)] = rmse
-    df.loc[location_idx, ("CRPS", model_type)] = crps
-    df.loc[location_idx, ("SCRPS", model_type)] = scrps
-
-    print(f"Location {location} - Bias: {bias:.4f}, RMSE: {rmse:.4f}, CRPS: {crps:.4f}, SCRPS: {scrps:.4f}")
-
-# Save updated DataFrame
-df.to_csv(csv_path)
-print(f"\nMetrics evaluation complete. Results saved to {csv_path}")
-
-# Display summary statistics
-print("\nA2E Metrics Summary:")
-a2e_metrics = df.loc[:, (["Bias", 'RMSE', 'CRPS', 'SCRPS'], model_type)]
-print(a2e_metrics.describe())
+# Location means into the CSV
+write_metrics(METRICS_EVALUATION_CSV, results, model="AnEn")
+print_summary(results, "AnEn")

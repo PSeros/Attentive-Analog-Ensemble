@@ -17,6 +17,7 @@ class WindDataLoader:
         self.data_dir = Path(data_dir)
         self.observation_data = None
         self.forecast_data = None
+        self.time_index = None  # pandas.DatetimeIndex of the loaded data (row i <-> time_index[i])
 
     def sort_locations(self, df):
         """
@@ -189,6 +190,12 @@ class WindDataLoader:
         # Check for NaN/Inf in each component
         for comp, df in component_dfs.items():
             self.check_nan_inf(df, comp, data_type)
+
+        # Time axis (identical for all components, see check_alignment)
+        index = next(iter(component_dfs.values())).index
+        if self.time_index is not None and not self.time_index.equals(index):
+            raise ValueError("Observations and forecasts have different time axes.")
+        self.time_index = index
 
         # Prepare the list of arrays in the order specified by the user
         component_arrays = []
