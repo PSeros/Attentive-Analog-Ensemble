@@ -30,6 +30,7 @@ class ModelPathBundle(TypedDict):
     directory: Path
     model: Path
     config: Path
+    history: Path
     evaluation: Path
 
 
@@ -50,12 +51,16 @@ def model_dir(model_type: str, location: int | None = None) -> Path:
 
 
 def model_paths(model_type: str, model_name: str, location: int | None = None) -> ModelPathBundle:
-    """Return common paths for a trained model and its config/evaluation folder."""
+    """Return common paths for a trained model and its config/history/evaluation folder.
+
+    The history JSON is written by a2e.io.Api.train after the final save and marks a finished training run.
+    """
     directory = model_dir(model_type, location)
     return {
         "directory": directory,
         "model": directory / f"{model_name}.keras",
         "config": directory / f"{model_name}_config.json",
+        "history": directory / f"{model_name}_history.json",
         "evaluation": directory / f"{model_name}_evaluation",
     }
 
