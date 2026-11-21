@@ -63,8 +63,10 @@ class CA2EPipeline(BaseTrainingPipeline):
             i = tf.cast(i, tf.int32)
             loc = tf.cast(loc, tf.int32)
 
-            # Extract historical data
-            X_h = f_data[i: i + self.config.lookback, loc]
+            # Extract historical data: the forecasts are shifted by `foresight` against the values, so that the
+            # window ending in row r carries a_data[r - foresight], the value at its target time.
+            fs = self.config.foresight
+            X_h = f_data[i + fs: i + self.config.lookback + fs, loc]
             Y_h = a_data[i: i + self.config.lookback, loc]
 
             # Extract current sequence
