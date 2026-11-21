@@ -32,10 +32,13 @@ ANEN = SimpleNamespace(seq_len=3, foresight=1, time_to_target=2, d_vars=2)
 ANEN_NO_OBS = SimpleNamespace(seq_len=3, foresight=1, time_to_target=2, d_vars=1)
 
 
-def location_range(n_locations: int):
-    """Locations from the optional command line arguments `first last` (end exclusive), default all."""
-    first = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-    last = int(sys.argv[2]) if len(sys.argv) > 2 else n_locations
+def location_range(n_locations: int, arg: int = 1):
+    """
+    Locations from the optional command line arguments `first last` (end exclusive) at positions arg, arg + 1,
+    default all.
+    """
+    first = int(sys.argv[arg]) if len(sys.argv) > arg else 0
+    last = int(sys.argv[arg + 1]) if len(sys.argv) > arg + 1 else n_locations
     return range(first, last)
 
 
