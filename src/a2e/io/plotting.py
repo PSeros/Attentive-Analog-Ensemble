@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from scipy.stats import gaussian_kde
 from typing import Literal
-from a2e.metrics.computation import compute_crps, compute_scrps, compute_bias, compute_rmse, compute_quantiles
+from a2e.metrics.computation import (compute_crps, compute_scrps, compute_bias, compute_rmse, compute_quantiles,
+                                     compute_pit)
 
 def plot_bias(
     y_true: tf.Tensor,
@@ -343,87 +344,53 @@ def plot_values(
     return ax
 
 
-def rank_histogram(
+def pit_histogram(
         y_true: tf.Tensor,
         ensemble_observations: tf.Tensor,
         member_weights: tf.Tensor = None,
         bins: int = 10,
-        handle_ties: Literal["uniform", "exclude"] = "uniform",
-        title: str = "Rank Histogram",
+        seed: int = 0,
+        title: str = "PIT Histogram",
         ax: plt.Axes = None,
 ) -> plt.Axes:
     """
-    Generates a Rank histogram for probabilistic forecasts using vectorized operations.
-    A Rank histogram visualizes the distribution of forecast ranks to assess calibration.
+    PIT histogram of probabilistic forecasts given as (weighted) ensembles, to assess calibration.
+
+    The PIT of each forecast is the randomized PIT of the observation under the weighted ensemble CDF F:
+    F(y-) + u * (F(y) - F(y-)) with u ~ U(0, 1) (a2e.metrics.computation.compute_pit). The member weights enter
+    through F; ties between the observation and members are spread uniformly over the jump of F at y.
+    For a calibrated forecast the PIT is uniformly distributed on [0, 1]. A U shape indicates an underdispersive,
+    a hump shape an overdispersive ensemble; a slope indicates a bias.
 
     Args:
         y_true (tf.Tensor): Observed values, shape (n_forecasts,).
-        ensemble_observations (tf.Tensor): Ensemble member forecasts,
-            shape (n_forecasts, n_members).
-        member_weights (tf.Tensor, optional): Weights for each ensemble member,
-            shape (n_forecasts, n_members). Defaults to equal weights.
-        bins (int, optional): Number of histogram bins. Default is 10.
-        handle_ties (["uniform", "exclude"], optional): How to handle ties between observation and members:
-            - "uniform": distribute tied mass uniformly within the tie interval.
-            - "exclude": omit tied cases.
-            Defaults to "uniform".
-        title (str, optional): Plot title. Defaults to "Rank Histogram".
+        ensemble_observations (tf.Tensor): Ensemble members, shape (n_forecasts, n_members).
+        member_weights (tf.Tensor, optional): Normalized member weights, shape (n_forecasts, n_members).
+            Defaults to equal weights.
+        bins (int, optional): Number of histogram bins on [0, 1]. Default is 10.
+        seed (int, optional): Seed of the uniform random numbers u. Default is 0.
+        title (str, optional): Plot title. Defaults to "PIT Histogram".
         ax (plt.Axes, optional): Matplotlib Axes on which to plot. If None, a new figure is created.
 
     Returns:
         plt.Axes: The Axes object containing the histogram.
     """
-    # Extract shapes and prepare tensors
-    n_forecasts, n_members = tf.unstack(tf.shape(ensemble_observations))
-
-    if len(y_true.shape) == 1:
-        y_true = tf.expand_dims(y_true, axis=-1)
-
-    # Initialize equal weights if none provided
+    y_true = tf.reshape(tf.cast(y_true, tf.float32), (-1,))
+    ensemble_observations = tf.cast(ensemble_observations, tf.float32)
     if member_weights is None:
-        member_weights = tf.ones_like(ensemble_observations) / tf.cast(n_members, tf.float32)
+        n_members = tf.cast(tf.shape(ensemble_observations)[1], tf.float32)
+        member_weights = tf.ones_like(ensemble_observations) / n_members
+    u = tf.random.stateless_uniform(tf.shape(y_true), seed=[seed, 0])
+    pit = compute_pit(ensemble_observations, member_weights, y_true, u).numpy()
 
-    # Ensure consistent dtypes
-    y_true = tf.cast(y_true, dtype=tf.float32)
-    ensemble_observations = tf.cast(ensemble_observations, dtype=tf.float32)
-    member_weights = tf.cast(member_weights, dtype=tf.float32)
-
-    # Vectorized rank computation
-    # Expand y_true to broadcast with ensemble_observations: (n_forecasts, 1) -> (n_forecasts, n_members)
-    y_expanded = tf.expand_dims(y_true[:, 0], axis=1)
-
-    # Create boolean masks for comparisons
-    below_mask = ensemble_observations < y_expanded  # (n_forecasts, n_members)
-    equal_mask = tf.abs(ensemble_observations - y_expanded) < 1e-8  # (n_forecasts, n_members)
-
-    # Compute weights below and equal for all forecasts at once
-    weight_below = tf.reduce_sum(member_weights * tf.cast(below_mask, tf.float32), axis=1)  # (n_forecasts,)
-    weight_equal = tf.reduce_sum(member_weights * tf.cast(equal_mask, tf.float32), axis=1)  # (n_forecasts,)
-
-    if handle_ties == "uniform":
-        # Generate random uniform values for all forecasts
-        u = tf.random.uniform((n_forecasts,), 0, 1)
-        ranks = weight_below + weight_equal * u
-    elif handle_ties == "exclude":
-        # Create mask for non-tied cases
-        non_tied_mask = weight_equal < 1e-8
-        ranks = tf.boolean_mask(weight_below, non_tied_mask)
-    else:
-        raise ValueError(f"handle_ties has to be 'uniform' or 'exclude' but is '{handle_ties}'")
-
-    # Create plot
     if ax is None:
         _, ax = plt.subplots(figsize=(8, 5))
-
-    ranks_np = ranks.numpy()
-    ax.hist(ranks_np, bins=bins, density=True, alpha=0.5, edgecolor='k')
+    heights, _, _ = ax.hist(pit, bins=bins, range=(0, 1), density=True, alpha=0.5, edgecolor='k')
     ax.axhline(1, color='k', linestyle='--', label='Uniform Reference')
-
-    # Set labels and title
     ax.set(
-        ylim=[0, 2],
+        ylim=[0, max(2.0, 1.05 * float(heights.max()))],
         xlim=[0, 1],
-        xlabel="Normalized Rank",
+        xlabel="PIT",
         ylabel="Density",
         title=title
     )

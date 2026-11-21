@@ -73,11 +73,11 @@ EVALUATION = [
 ]
 
 AUXILIARY = [
-    "experiments.evaluation.A2E.a2e_rank_histogram",
+    "experiments.evaluation.A2E.a2e_pit_histogram",
     "experiments.evaluation.A2E.a2e_training-test-bias",
     "experiments.evaluation.A2E.a2e_comparison",
     "experiments.evaluation.CA2E.ca2e_comparison",
-    "experiments.evaluation.SA2E.sa2e_rank_histogram",
+    "experiments.evaluation.SA2E.sa2e_pit_histogram",
     "experiments.evaluation.AnEn.anen_training-test-bias",
     "experiments.evaluation.values_comparison",
 ]
