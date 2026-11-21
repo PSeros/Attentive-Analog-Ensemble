@@ -40,6 +40,7 @@ class ModelConfig:
 
     # Training parameters (Used to track the total number of epochs)
     epochs: int = None
+    seed: Optional[int] = None               # Set with tf.keras.utils.set_random_seed before the model is built
     best_epoch: Optional[int] = None         # Cumulative, 1-based epoch with the lowest val_loss (weights of the saved model)
     best_val_loss: Optional[float] = None    # val_loss of best_epoch
 

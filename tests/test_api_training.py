@@ -4,6 +4,7 @@ Training through a2e.io.Api on a small synthetic data set.
 - The saved model has the weights of the epoch with the lowest val_loss, also without early stopping (F2).
 - Checkpointing is done only by the Api (F2).
 - History JSON with ESS, g and the gradient/weight share outside the top-k (F4).
+- config.seed fixes the initial weights (F5).
 
 Run from the repository root:
     .venv/bin/python -m unittest tests.test_api_training -v
@@ -60,6 +61,12 @@ class WeightRecorder(tf.keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         self.weights.append(trainable(self.model))
+
+
+class InitialWeights(tf.keras.callbacks.Callback):
+    """Trainable weights at the start of training."""
+    def on_train_begin(self, logs=None):
+        self.weights = trainable(self.model)
 
 
 class SpoilLastEpoch(tf.keras.callbacks.Callback):
@@ -175,6 +182,23 @@ class TestBestWeights(unittest.TestCase):
             with open(a2e.io.Api.history_path(path)) as f:
                 history = json.load(f)["history"]
             self.assertEqual(history["g"], [None] * EPOCHS)
+
+    def test_seed(self):
+        initial = {}
+        with tempfile.TemporaryDirectory() as tmp:
+            for run, seed in [("a", 42), ("b", 42), ("c", 7)]:
+                path = os.path.join(tmp, f"{run}.keras")
+                recorder = InitialWeights()
+                tf.random.uniform(())  # advances the global random state between the runs
+                train(make_config(seed=seed), path, [recorder])
+                initial[run] = recorder.weights
+                with open(a2e.io.Api.history_path(path)) as f:
+                    record = json.load(f)
+                self.assertEqual(record["seed"], seed)
+                self.assertEqual(record["config"]["seed"], seed)
+        for a, b in zip(initial["a"], initial["b"]):
+            np.testing.assert_array_equal(a, b)
+        self.assertTrue(any(not np.array_equal(a, c) for a, c in zip(initial["a"], initial["c"])))
 
     def test_model_checkpoint_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
