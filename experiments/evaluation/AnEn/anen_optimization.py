@@ -76,8 +76,9 @@ def run(loc):
     feat = np.stack([x[IDX:], o[:-IDX]], 1)       # row i: [x_{i+3}, y_i]
     tgt = o[IDX:]                                  # row i: y_{i+3}
     res = []
-    # --- validation (identical to anen_metrics.py): archive rows [:-test_size], targets rows [-(test_size+2):]
-    xh, yh = feat[:-test_size], tgt[:-test_size]
+    # --- validation (identical to anen_metrics.py, a2e.io.anen_inputs): archive rows [:-(test_size+1)], i.e. up to
+    # the window whose value lies at the issue time of the first query; query windows rows [-(test_size+2):]
+    xh, yh = feat[:-test_size - 1], tgt[:-test_size - 1]
     sig = xh.std(0)
     tw, hw = windows(feat[-(test_size + 2):]), windows(xh)
     y_val = tgt[-test_size - 1:-1]
