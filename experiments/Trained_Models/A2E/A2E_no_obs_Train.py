@@ -1,5 +1,5 @@
 """
-A2E without observation inputs (ablation, review M2).
+A2E without observation inputs (ablation).
 
 Difference from A2E_Train.py: d_vars=1, the features contain only the wind speed forecast
 (a2e.io.build_features(..., observation_inputs=False)). Targets, archive values and samples are the same.

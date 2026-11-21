@@ -1,5 +1,5 @@
 """
-Evaluation of A2E with a temporal window of T = 3 (ablation, review M2).
+Evaluation of A2E with a temporal window of T = 3 (ablation).
 
 Validation period (3720 samples per location) with a static archive of all earlier windows whose value is known at
 the issue time of the first sample (a2e.io.evaluation_split).
