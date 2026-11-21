@@ -139,7 +139,7 @@ class Api:
             - embeddings (tf.Tensor): Embedded sequences with shape (batch, timesteps-seq_len+1, embedding dimension).
         """
         # Convert to tf.Tensor
-        forecasts = tf.cast(forecasts, dtype=tf.float16)
+        forecasts = tf.cast(forecasts, dtype=tf.float32)  # same precision as in training
         # Validate input
         if model_path:
             self.model = tf.keras.models.load_model(model_path)
