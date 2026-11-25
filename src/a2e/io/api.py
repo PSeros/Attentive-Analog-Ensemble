@@ -491,7 +491,9 @@ class Api:
         if value is None:
             return None
         tensor = tf.constant(value, dtype=tf.float32)
-        if tensor.shape.rank and tensor.shape.rank > 1 and tensor.shape[0] == 1:
+        # Stats adapted over (time, ..., features) keep a 1 per reduced axis: A2E (1, F), CA2E/SA2E (1, 1, F).
+        # Keras 3 Normalization(axis=-1) needs shape (F,).
+        while tensor.shape.rank and tensor.shape.rank > 1 and tensor.shape[0] == 1:
             tensor = tf.squeeze(tensor, axis=0)
         return tensor.numpy().tolist()
 
