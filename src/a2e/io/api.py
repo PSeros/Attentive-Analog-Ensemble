@@ -3,7 +3,7 @@ import json
 import tensorflow as tf
 from typing import Tuple, List, Union
 from a2e.io.config import ModelConfig
-from a2e.callbacks.callbacks import EpochTracker, BestWeights, TrainingMonitor
+from a2e.callbacks.callbacks import EpochTracker, BestWeights, TrainingMonitor, TrainingTimer
 from a2e.io.plotting import plot_training_history
 from a2e.factory.factory import Factory
 
@@ -15,6 +15,7 @@ class Api:
         self.training_history = None
         self.best_weights = None
         self.monitor = None
+        self.timer = None
 
     def train(
             self,
@@ -43,7 +44,8 @@ class Api:
         Op determinism is not enabled (runtime).
 
         After the final save, `<model_name>_history.json` is written next to the model (see `_save_history`).
-        It is the marker for a finished training run.
+        It is the marker for a finished training run. It contains the training time (TrainingTimer): seconds per
+        epoch in `history.epoch_time`, the total in `training_time_s`, and the `device`.
 
         Args:
             forecasts (tf.Tensor): Historical forecast data
@@ -373,6 +375,9 @@ class Api:
         callbacks.insert(0, self.best_weights)
         if self.monitor is not None:
             callbacks.insert(0, self.monitor)
+        # Timer first: epoch_time without the probe of the monitor and without the checkpoint save
+        self.timer = TrainingTimer()
+        callbacks.insert(0, self.timer)
 
         if save_path:
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -415,6 +420,11 @@ class Api:
             callbacks=callbacks,
             initial_epoch=0  # Always start from 0 for the current training session
         )
+
+        epoch_times = self.training_history.history.get("epoch_time", [])
+        if self.timer.total is not None and epoch_times:
+            print(f"Training time: {self.timer.total / 60:.1f} min for {len(epoch_times)} epochs "
+                  f"({sum(epoch_times) / len(epoch_times):.1f} s per epoch) on {self._device_name()}")
 
         # Weights of the best epoch, independent of whether EarlyStopping triggered
         if self.best_weights.restore():
@@ -466,6 +476,15 @@ class Api:
         return tensor.numpy().tolist()
 
     @staticmethod
+    def _device_name() -> str:
+        """Name of the GPU(s) used for training, or "CPU"."""
+        gpus = tf.config.list_physical_devices("GPU")
+        if not gpus:
+            return "CPU"
+        names = [tf.config.experimental.get_device_details(gpu).get("device_name", gpu.name) for gpu in gpus]
+        return ", ".join(names)
+
+    @staticmethod
     def history_path(save_path: str) -> str:
         """Path of the history JSON of a model (`<model_name>_history.json` next to the model)."""
         return os.path.splitext(save_path)[0] + "_history.json"
@@ -474,9 +493,12 @@ class Api:
         """
         Writes `<model_name>_history.json`:
             seed, config, initial_epoch, epochs_trained, best_epoch, best_val_loss, stopped_early,
-            probe (size, top_k) and history: one list per Keras log (loss, crps, entropy, ess, lr, ... and the
-            val_ variants), g and the gradient/weight share outside the top-k (TrainingMonitor).
-        Epoch numbers are cumulative and 1-based; `history` covers the epochs of this session.
+            training_time_s, device, probe (size, top_k) and history: one list per Keras log (loss, crps, entropy,
+            ess, lr, ... and the val_ variants), g and the gradient/weight share outside the top-k (TrainingMonitor),
+            epoch_time (TrainingTimer).
+        Epoch numbers are cumulative and 1-based; `history` and `training_time_s` cover this session.
+        Training times are wall-clock seconds (see TrainingTimer); they depend on the device and on other jobs
+        running on it.
         """
         if not save_path or self.training_history is None:
             return
@@ -486,7 +508,7 @@ class Api:
 
         history = {key: [to_json(v) for v in values] for key, values in self.training_history.history.items()}
         n_epochs = len(history.get("loss", []))
-        for key in ["g", self.monitor.grad_key, self.monitor.weight_key]:
+        for key in ["g", self.monitor.grad_key, self.monitor.weight_key, "epoch_time"]:
             history.setdefault(key, [None] * n_epochs)
 
         record = {
@@ -497,6 +519,8 @@ class Api:
             "best_epoch": self.config.best_epoch,
             "best_val_loss": self.config.best_val_loss,
             "stopped_early": n_epochs < epochs_to_train,
+            "training_time_s": to_json(self.timer.total),
+            "device": self._device_name(),
             "probe": {"size": probe_size, "top_k": self.monitor.top_k,
                       "samples": "evenly spaced over the training samples, inference mode"},
             "history": history,
