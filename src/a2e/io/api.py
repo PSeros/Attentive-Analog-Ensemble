@@ -38,6 +38,10 @@ class Api:
         final save, also if training ran the full number of epochs. `config.best_epoch` and `config.best_val_loss`
         describe the saved weights. Do not pass a ModelCheckpoint in `callbacks`.
 
+        If `config.seed` is set, `tf.keras.utils.set_random_seed(config.seed)` is called before the model is built,
+        so that the result of one model does not depend on models trained before it in the same process.
+        Op determinism is not enabled (runtime).
+
         After the final save, `<model_name>_history.json` is written next to the model (see `_save_history`).
         It is the marker for a finished training run.
 
@@ -88,6 +92,9 @@ class Api:
             if not success:
                 resume_training = False
                 current_epoch = 0
+
+        if self.config.seed is not None:
+            tf.keras.utils.set_random_seed(self.config.seed)
 
         if not resume_training:
             self._create_new_model(optimizer, loss, metrics)
@@ -471,7 +478,7 @@ class Api:
             history.setdefault(key, [None] * n_epochs)
 
         record = {
-            "seed": getattr(self.config, "seed", None),
+            "seed": self.config.seed,
             "config": self.config.to_dict(),
             "initial_epoch": current_epoch,
             "epochs_trained": self.config.epochs,
