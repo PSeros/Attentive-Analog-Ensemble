@@ -1,4 +1,5 @@
 import tensorflow as tf
+from a2e.layer.encoder import dilated_layers_per_block, warn_receptive_field
 
 
 def _encoded_time_steps(input_time_steps, seq_len):
@@ -51,7 +52,7 @@ class SpatialDilatedConvLayer(tf.keras.layers.Layer):
     Combines temporal dilated convolution with spatial convolution for spatio-temporal data.
     Supports conditional processing similar to the conditional WaveNet.
     """
-    def __init__(self, filter, seq_len, locations_kernel_size=3, dropout=.0, name=None, **kwargs):
+    def __init__(self, filter, seq_len, locations_kernel_size=3, dropout=.0, num_layers=None, name=None, **kwargs):
         """
         Initializes a dilated convolutional layer for spatiotemporal data used in SpatialWaveNet model.
         Using Gated Activation Units.
@@ -69,12 +70,11 @@ class SpatialDilatedConvLayer(tf.keras.layers.Layer):
         self.locations_kernel_size = locations_kernel_size
         self.dropout_rate = dropout
 
-        # Calculate dilated convolution layers
+        # Calculate dilated convolution layers (default: ceil(log2(seq_len)))
         kernel_size = 2
-        _seq_len = tf.constant(self.seq_len, dtype=tf.float32)
-        _kernel_size = tf.constant(kernel_size, dtype=tf.float32)
-        _num_layers = tf.math.log(_seq_len) / tf.math.log(_kernel_size)
-        num_layers = int(tf.math.ceil(_num_layers))
+        if num_layers is None:
+            num_layers = dilated_layers_per_block(seq_len, 1, kernel_size)
+        self.num_layers = num_layers
 
         # Gated dilated convolution components (f and g)
         # Use Conv2D with dilation along time dimension only
@@ -183,6 +183,7 @@ class SpatialDilatedConvLayer(tf.keras.layers.Layer):
             "seq_len": self.seq_len,
             "locations_kernel_size": self.locations_kernel_size,
             "dropout": self.dropout_rate,
+            "num_layers": self.num_layers,
         })
         return config
 
@@ -193,7 +194,7 @@ class SpatialDilatedConvLayer(tf.keras.layers.Layer):
 
 @tf.keras.utils.register_keras_serializable(package="A2E")
 class SpatialWaveNetBlock(tf.keras.layers.Layer):
-    def __init__(self, d_model, seq_len, locations_kernel_size=3, dropout=.0, name=None, **kwargs):
+    def __init__(self, d_model, seq_len, locations_kernel_size=3, dropout=.0, num_layers=None, name=None, **kwargs):
         """
         Initializes a block used in the WaveNet architecture.
         Consisting of a Dilated Convolution and a linear projection.
@@ -218,7 +219,9 @@ class SpatialWaveNetBlock(tf.keras.layers.Layer):
             seq_len=seq_len,
             locations_kernel_size=locations_kernel_size,
             dropout=dropout,
+            num_layers=num_layers,
         )
+        self.num_layers = self.dilated_conv.num_layers
         self.ff = tf.keras.layers.Dense(d_model)
 
     def build(self, input_shape):
@@ -263,6 +266,7 @@ class SpatialWaveNetBlock(tf.keras.layers.Layer):
             "seq_len": self.seq_len,
             "locations_kernel_size": self.locations_kernel_size,
             "dropout": self.dropout,
+            "num_layers": self.num_layers,
         })
         return config
 
@@ -295,12 +299,17 @@ class SpatialWaveNet(tf.keras.layers.Layer):
         self.locations_kernel_size = locations_kernel_size
         self.dropout_rate = dropout
 
+        # Dilated causal convolutions per block: L = ceil(log2(seq_len / n_blocks)), receptive field 1 + n_blocks*(2^L-1)
+        num_layers = dilated_layers_per_block(seq_len, n_blocks)
+        self.receptive_field = warn_receptive_field(seq_len, n_blocks)
+
         # Key Components
         self.wave_net_blocks = [SpatialWaveNetBlock(
             d_model=d_model,
             seq_len=seq_len // n_blocks,
             locations_kernel_size=locations_kernel_size,
             dropout=dropout,
+            num_layers=num_layers,
         ) for _ in range(n_blocks)]
 
         self.dense1 = tf.keras.layers.Dense(d_model, activation="relu")
