@@ -38,22 +38,18 @@ class SA2EPipeline(BaseTrainingPipeline):
             message="Second dimension of forecasts must match number of d_loc"
         )
 
-    def _create_dataset(self, f_data, a_data):
-        """Creates an index-based sliding window dataset for training SA2E."""
-        ds = tf.data.Dataset.range(tf.cast(self.num_samples, tf.int64))
+    def _extract_sample(self, f_data, a_data, i):
+        """Sliding window sample i for training SA2E."""
+        i = tf.cast(i, tf.int32)
+        # Archive: the forecasts are shifted by `foresight` against the values, so that the window ending in
+        # row r carries a_data[r - foresight], the value at its target time (same convention as y_t below).
+        fs = self.config.foresight
+        X_h = f_data[i + fs: i + self.config.lookback + fs]
+        Y_h = a_data[i: i + self.config.lookback]
 
-        def extract_sample(i):
-            i = tf.cast(i, tf.int32)
-            # Archive: the forecasts are shifted by `foresight` against the values, so that the window ending in
-            # row r carries a_data[r - foresight], the value at its target time (same convention as y_t below).
-            fs = self.config.foresight
-            X_h = f_data[i + fs: i + self.config.lookback + fs]
-            Y_h = a_data[i: i + self.config.lookback]
+        start = i + self.config.lookback + self.config.time_to_target - self.config.seq_len
+        end = i + self.config.lookback + self.config.time_to_target
+        X_t = f_data[start + 1: end + 1]
 
-            start = i + self.config.lookback + self.config.time_to_target - self.config.seq_len
-            end = i + self.config.lookback + self.config.time_to_target
-            X_t = f_data[start + 1: end + 1]
-
-            y_t = a_data[end - self.config.foresight]
-            return (X_t, X_h, Y_h), y_t
-        return ds.map(extract_sample, num_parallel_calls=tf.data.AUTOTUNE).prefetch(tf.data.AUTOTUNE)
+        y_t = a_data[end - self.config.foresight]
+        return (X_t, X_h, Y_h), y_t

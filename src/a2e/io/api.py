@@ -1,8 +1,9 @@
 import os
+import json
 import tensorflow as tf
 from typing import Tuple, List, Union
 from a2e.io.config import ModelConfig
-from a2e.callbacks.callbacks import EpochTracker, BestWeights
+from a2e.callbacks.callbacks import EpochTracker, BestWeights, TrainingMonitor
 from a2e.io.plotting import plot_training_history
 from a2e.factory.factory import Factory
 
@@ -13,6 +14,7 @@ class Api:
         self.model = None
         self.training_history = None
         self.best_weights = None
+        self.monitor = None
 
     def train(
             self,
@@ -25,7 +27,8 @@ class Api:
             test_size: float,
             metrics: List[tf.keras.metrics.Metric] = None,
             callbacks: List[tf.keras.callbacks.Callback] = None,
-            save_path: str = None
+            save_path: str = None,
+            probe_top_k: int = 100,
     ) -> Tuple[tf.keras.models.Model, tf.keras.callbacks.History]:
         """
         Api for Training any A2E model.
@@ -34,6 +37,9 @@ class Api:
         (ModelCheckpoint at `save_path`), and after training the weights of the best epoch are restored before the
         final save, also if training ran the full number of epochs. `config.best_epoch` and `config.best_val_loss`
         describe the saved weights. Do not pass a ModelCheckpoint in `callbacks`.
+
+        After the final save, `<model_name>_history.json` is written next to the model (see `_save_history`).
+        It is the marker for a finished training run.
 
         Args:
             forecasts (tf.Tensor): Historical forecast data
@@ -46,6 +52,8 @@ class Api:
             metrics (tf.keras.metrics.Metric): List of metrics to track
             callbacks (tf.keras.callbacks.Callback): List of callbacks
             save_path (str): Path to save model
+            probe_top_k (int): k for the gradient and weight share outside the top-k, computed each epoch on a
+                fixed probe batch of `batch_size` training samples (TrainingMonitor).
 
         Returns:
             Tuple of (trained_model (tf.keras.models.Model), training_history (tf.keras.callbacks.History))
@@ -66,6 +74,10 @@ class Api:
             test_size=test_size,
             batch_size=batch_size
         )
+
+        # Per-epoch monitoring: temperature g, gradient and weight share outside the top-k on a fixed probe batch
+        probe_inputs, probe_targets = pipeline.get_probe_data(batch_size)
+        self.monitor = TrainingMonitor(probe_inputs, probe_targets, top_k=probe_top_k)
 
         # Handle model creation/loading and epoch calculation
         current_epoch = 0
@@ -94,6 +106,9 @@ class Api:
 
         # Plot results and save model
         self._plot_and_save_results(save_path, current_epoch, target_epoch, resume_training, epochs_to_train)
+
+        # History JSON last: marks the training run as finished
+        self._save_history(save_path, current_epoch, epochs_to_train, batch_size)
 
         return self.model, self.training_history
 
@@ -337,6 +352,8 @@ class Api:
             best_epoch=self.config.best_epoch if current_epoch > 0 else None,
         )
         callbacks.insert(0, self.best_weights)
+        if self.monitor is not None:
+            callbacks.insert(0, self.monitor)
 
         if save_path:
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -428,3 +445,44 @@ class Api:
         if tensor.shape.rank and tensor.shape.rank > 1 and tensor.shape[0] == 1:
             tensor = tf.squeeze(tensor, axis=0)
         return tensor.numpy().tolist()
+
+    @staticmethod
+    def history_path(save_path: str) -> str:
+        """Path of the history JSON of a model (`<model_name>_history.json` next to the model)."""
+        return os.path.splitext(save_path)[0] + "_history.json"
+
+    def _save_history(self, save_path: str, current_epoch: int, epochs_to_train: int, probe_size: int) -> None:
+        """
+        Writes `<model_name>_history.json`:
+            seed, config, initial_epoch, epochs_trained, best_epoch, best_val_loss, stopped_early,
+            probe (size, top_k) and history: one list per Keras log (loss, crps, entropy, ess, lr, ... and the
+            val_ variants), g and the gradient/weight share outside the top-k (TrainingMonitor).
+        Epoch numbers are cumulative and 1-based; `history` covers the epochs of this session.
+        """
+        if not save_path or self.training_history is None:
+            return
+
+        def to_json(value):
+            return None if value is None else float(value)
+
+        history = {key: [to_json(v) for v in values] for key, values in self.training_history.history.items()}
+        n_epochs = len(history.get("loss", []))
+        for key in ["g", self.monitor.grad_key, self.monitor.weight_key]:
+            history.setdefault(key, [None] * n_epochs)
+
+        record = {
+            "seed": getattr(self.config, "seed", None),
+            "config": self.config.to_dict(),
+            "initial_epoch": current_epoch,
+            "epochs_trained": self.config.epochs,
+            "best_epoch": self.config.best_epoch,
+            "best_val_loss": self.config.best_val_loss,
+            "stopped_early": n_epochs < epochs_to_train,
+            "probe": {"size": probe_size, "top_k": self.monitor.top_k,
+                      "samples": "evenly spaced over the training samples, inference mode"},
+            "history": history,
+        }
+        path = self.history_path(save_path)
+        with open(path, "w") as f:
+            json.dump(record, f, indent=2)
+        print(f"History saved at: {os.path.abspath(path)}")

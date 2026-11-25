@@ -41,6 +41,23 @@ class CA2E(tf.keras.Model):
         # Cross-Attention (g_zero_init is only applied for ["cosine_similarity", "pearson_correlation"])
         self.cross_attention = CrossAttention(similarity_metric, g_zero_init=lookback-seq_len+1, name="cross_attention")
 
+    def encode(self, inputs, training=None):
+        """
+        Embeddings of the current and the historical windows (location-conditioned) and the aligned archive values.
+
+        :param inputs: (x_c, x_h, y_h, loc) as in `call`
+        :return: z_c (batch, 1, d_model), z_h (batch, new_lookback, d_model), y_h (batch, new_lookback)
+        """
+        x_c, x_h, y_h, loc = inputs
+
+        # Encode with location conditioning
+        z_c = self.encoder(x_c, loc=loc, training=training)  # shape (batch, seq_len, d_model)
+        z_h = self.encoder(x_h, loc=loc, training=training)  # shape (batch, lookback, d_model)
+
+        # Align y_h with z_h (remove padded region)
+        y_h = y_h[:, self.seq_len - 1:, 0]          # shape (batch, new_lookback)
+        return z_c, z_h, y_h
+
     def call(self, inputs, training=None) -> tf.Tensor:
         """
         :param inputs:
@@ -53,14 +70,7 @@ class CA2E(tf.keras.Model):
             - [:, :, 0] y_h: Tensor with historical observations (batch, lookback) or (batch, lookback, k)
             - [:, :, 1] w_h: Tensor with historical weights (batch, lookback) or (batch, k)
         """
-        x_c, x_h, y_h, loc = inputs
-
-        # Encode with location conditioning
-        z_c = self.encoder(x_c, loc=loc, training=training)  # shape (batch, seq_len, d_model)
-        z_h = self.encoder(x_h, loc=loc, training=training)  # shape (batch, lookback, d_model)
-
-        # Align y_h with z_h (remove padded region)
-        y_h = y_h[:, self.seq_len - 1:, 0]          # shape (batch, new_lookback)
+        z_c, z_h, y_h = self.encode(inputs, training=training)
 
         # Cross-Attention -> Attention Weights, Values | both with shape (batch, new_lookback) or (batch, k)
         y_h, w_h = self.cross_attention(query=z_c, keys=z_h, values=y_h, k=self.k)

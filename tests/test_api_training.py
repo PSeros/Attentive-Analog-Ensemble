@@ -3,6 +3,7 @@ Training through a2e.io.Api on a small synthetic data set.
 
 - The saved model has the weights of the epoch with the lowest val_loss, also without early stopping (F2).
 - Checkpointing is done only by the Api (F2).
+- History JSON with ESS, g and the gradient/weight share outside the top-k (F4).
 
 Run from the repository root:
     .venv/bin/python -m unittest tests.test_api_training -v
@@ -17,6 +18,7 @@ import tensorflow as tf
 import a2e
 
 EPOCHS = 3
+TOP_K = 10
 
 
 def make_config(**kwargs):
@@ -61,16 +63,21 @@ class WeightRecorder(tf.keras.callbacks.Callback):
 
 
 class SpoilLastEpoch(tf.keras.callbacks.Callback):
-    """Randomizes the weights at the start of the last epoch, so that the last epoch is not the best one."""
+    """
+    Sets a very large temperature g right before the validation of the last epoch, so that the last epoch is not
+    the best one: the weights collapse onto single members and the SCRPS of the validation explodes.
+    """
     def __init__(self, last_epoch):
         super().__init__()
         self.last_epoch = last_epoch
+        self.epoch = None
 
     def on_epoch_begin(self, epoch, logs=None):
-        if epoch == self.last_epoch:
-            rng = np.random.default_rng(1)
-            self.model.set_weights([w + rng.normal(0, 3, w.shape).astype(w.dtype)
-                                    if w.dtype.kind == "f" else w for w in self.model.get_weights()])
+        self.epoch = epoch
+
+    def on_test_begin(self, logs=None):
+        if self.epoch == self.last_epoch:
+            self.model.cross_attention.g.assign(1e4)
 
 
 def train(config, save_path, callbacks):
@@ -86,8 +93,9 @@ def train(config, save_path, callbacks):
         batch_size=16,
         optimizer=tf.keras.optimizers.AdamW(learning_rate=0.01),
         loss=a2e.loss.SCRPS(),
-        metrics=[a2e.metrics.keras.CRPSMetric(), a2e.metrics.keras.EntropyMetric()],
+        metrics=[a2e.metrics.keras.CRPSMetric(), a2e.metrics.keras.EntropyMetric(), a2e.metrics.keras.ESSMetric()],
         callbacks=callbacks,
+        probe_top_k=TOP_K,
     )
     return api, history
 
@@ -96,6 +104,7 @@ class TestBestWeights(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        tf.keras.utils.set_random_seed(0)
         cls.tmp = tempfile.TemporaryDirectory()
         cls.save_path = os.path.join(cls.tmp.name, "A2E_test.keras")
         cls.recorder = WeightRecorder()
@@ -125,6 +134,47 @@ class TestBestWeights(unittest.TestCase):
             np.testing.assert_array_equal(value, reference)
         self.assertTrue(any(not np.array_equal(v, l) for v, l in zip(saved, self.recorder.weights[-1])),
                         "saved weights equal the weights of the last epoch")
+
+    def test_history_json(self):
+        with open(a2e.io.Api.history_path(self.save_path)) as f:
+            record = json.load(f)
+        for key in ["seed", "config", "initial_epoch", "epochs_trained", "best_epoch", "best_val_loss",
+                    "stopped_early", "probe", "history"]:
+            self.assertIn(key, record)
+        self.assertEqual(record["epochs_trained"], EPOCHS)
+        self.assertEqual(record["best_epoch"], int(np.argmin(self.val_loss)) + 1)
+        self.assertFalse(record["stopped_early"])
+        self.assertEqual(record["config"]["seq_len"], self.config.seq_len)
+        history = record["history"]
+        grad_key, weight_key = f"grad_share_outside_top{TOP_K}", f"weight_share_outside_top{TOP_K}"
+        for key in ["loss", "val_loss", "crps", "val_crps", "entropy", "ess", "val_ess", "g", grad_key, weight_key]:
+            self.assertEqual(len(history[key]), EPOCHS, key)
+        n_archive = self.config.lookback - self.config.seq_len + 1
+        for value in history["ess"] + history["val_ess"]:
+            self.assertTrue(1.0 <= value <= n_archive)
+        for value in history[grad_key] + history[weight_key]:
+            self.assertTrue(0.0 <= value <= 1.0)
+        # g is the temperature of the cross-attention at the end of each epoch (set to 1e4 in the last one)
+        self.assertNotEqual(history["g"][0], history["g"][1])
+        self.assertEqual(history["g"][-1], 1e4)
+
+    def test_probe_values(self):
+        """ESS on the probe batch is consistent with the weight share outside the top-k."""
+        monitor = self.api.monitor
+        grad_share, weight_share = monitor.probe()
+        z_c, z_h, y_h = self.api.model.encode(monitor.probe_inputs)
+        w = tf.nn.softmax(self.api.model.cross_attention.scores(z_c, z_h)).numpy()
+        w_sorted = -np.sort(-w, axis=-1)
+        np.testing.assert_allclose(weight_share, np.mean(1 - w_sorted[:, :TOP_K].sum(-1)), rtol=1e-5, atol=1e-6)
+
+    def test_euclidean_has_no_g(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "m.keras")
+            config = make_config(similarity_metric="euclidean_distance")
+            train(config, path, [])
+            with open(a2e.io.Api.history_path(path)) as f:
+                history = json.load(f)["history"]
+            self.assertEqual(history["g"], [None] * EPOCHS)
 
     def test_model_checkpoint_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

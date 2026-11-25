@@ -102,6 +102,7 @@ class TestPipelineAlignment(AlignmentChecks, unittest.TestCase):
         dataset = pipeline._create_dataset(features, targets)
         for i in (0, 1, 2, pipeline.num_samples // 2, pipeline.num_samples - 1):
             (x_t, x_h, y_h, loc), y_t = sample(dataset, i)
+            self.assertEqual(int(loc), i % n_locations, "CA2E order: all locations of a time step first")
             offset = LOC_OFFSET * int(loc)
             self.check_sample(np.asarray(x_t) - offset, np.asarray(x_h) - offset,
                               np.asarray(y_h) - offset, np.asarray(y_t) - offset)
