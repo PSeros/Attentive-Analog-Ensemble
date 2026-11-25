@@ -122,6 +122,7 @@ class TrainingMonitor(Callback):
         top = tf.math.top_k(s, k=k).indices
         grad_top = tf.reduce_sum(tf.gather(grad, top, batch_dims=1), axis=-1)
         grad_total = tf.reduce_sum(grad, axis=-1)
-        grad_share = 1.0 - grad_top / tf.maximum(grad_total, 1e-30)
-        weight_share = 1.0 - tf.reduce_sum(tf.gather(w, top, batch_dims=1), axis=-1)
+        # float32: with almost all weight in the top-k, 1 - share can be slightly below 0
+        grad_share = tf.clip_by_value(1.0 - grad_top / tf.maximum(grad_total, 1e-30), 0.0, 1.0)
+        weight_share = tf.clip_by_value(1.0 - tf.reduce_sum(tf.gather(w, top, batch_dims=1), axis=-1), 0.0, 1.0)
         return float(tf.reduce_mean(grad_share)), float(tf.reduce_mean(weight_share))
