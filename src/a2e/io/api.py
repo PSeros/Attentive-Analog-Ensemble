@@ -2,7 +2,7 @@ import os
 import tensorflow as tf
 from typing import Tuple, List, Union
 from a2e.io.config import ModelConfig
-from a2e.callbacks.callbacks import EpochTracker
+from a2e.callbacks.callbacks import EpochTracker, BestWeights
 from a2e.io.plotting import plot_training_history
 from a2e.factory.factory import Factory
 
@@ -12,6 +12,7 @@ class Api:
         self.factory = Factory(self.config)
         self.model = None
         self.training_history = None
+        self.best_weights = None
 
     def train(
             self,
@@ -28,6 +29,11 @@ class Api:
     ) -> Tuple[tf.keras.models.Model, tf.keras.callbacks.History]:
         """
         Api for Training any A2E model.
+
+        Checkpointing is done by the Api: the model with the lowest val_loss is kept during training
+        (ModelCheckpoint at `save_path`), and after training the weights of the best epoch are restored before the
+        final save, also if training ran the full number of epochs. `config.best_epoch` and `config.best_val_loss`
+        describe the saved weights. Do not pass a ModelCheckpoint in `callbacks`.
 
         Args:
             forecasts (tf.Tensor): Historical forecast data
@@ -73,6 +79,8 @@ class Api:
 
         if not resume_training:
             self._create_new_model(optimizer, loss, metrics)
+            self.config.best_epoch = None
+            self.config.best_val_loss = None
 
         print(self.model.summary())
 
@@ -260,6 +268,9 @@ class Api:
                 self.config.forecast_normalizer_variance = loaded_config.forecast_normalizer_variance
                 self.config.observation_normalizer_mean = loaded_config.observation_normalizer_mean
                 self.config.observation_normalizer_variance = loaded_config.observation_normalizer_variance
+                # Best epoch of the previous session (the saved weights)
+                self.config.best_epoch = loaded_config.best_epoch
+                self.config.best_val_loss = loaded_config.best_val_loss
 
                 # Get current epoch count
                 current_epoch = getattr(loaded_config, 'epochs', 0)
@@ -311,8 +322,21 @@ class Api:
         Returns:
             List of configured callbacks
         """
-        if callbacks is None:
-            callbacks = []
+        callbacks = list(callbacks or [])
+        if any(isinstance(cb, tf.keras.callbacks.ModelCheckpoint) for cb in callbacks):
+            raise ValueError("Checkpointing is done by the Api. Remove the ModelCheckpoint from `callbacks`.")
+
+        # Best weights first: they are taken before EarlyStopping may restore its own best weights.
+        # On resume, the best value of the previous session is the reference.
+        resumed_best = self.config.best_val_loss if current_epoch > 0 else None
+        self.best_weights = BestWeights(
+            config=self.config,
+            monitor="val_loss",
+            start_epoch=current_epoch,
+            best_value=resumed_best,
+            best_epoch=self.config.best_epoch if current_epoch > 0 else None,
+        )
+        callbacks.insert(0, self.best_weights)
 
         if save_path:
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -321,7 +345,8 @@ class Api:
                 filepath=save_path,
                 monitor="val_loss",
                 save_best_only=True,
-                mode="min"
+                mode="min",
+                initial_value_threshold=resumed_best,
             )
             callbacks.append(checkpoint)
 
@@ -354,6 +379,11 @@ class Api:
             callbacks=callbacks,
             initial_epoch=0  # Always start from 0 for the current training session
         )
+
+        # Weights of the best epoch, independent of whether EarlyStopping triggered
+        if self.best_weights.restore():
+            print(f"Restored weights of the best epoch {self.best_weights.best_epoch} "
+                  f"(val_loss {self.best_weights.best:.6f}).")
 
     def _plot_and_save_results(self, save_path: str, current_epoch: int,
                                target_epoch: int, resume_training: bool, epochs_to_train: int) -> None:
@@ -388,6 +418,7 @@ class Api:
         print(f"\nmodel saved at: {os.path.abspath(save_path)}")
         print(f"Config saved at: {os.path.abspath(config_path)}")
         print(f"Total cumulative epochs trained: {self.config.epochs}")
+        print(f"Saved weights: epoch {self.config.best_epoch} (val_loss {self.config.best_val_loss})")
 
     @staticmethod
     def _normalizer_value(value):
