@@ -30,6 +30,9 @@ class ModelConfig:
     d_vars: int
     foresight: int
     dropout: float = 0
+    # Trainable weight behind the temperature g of the cross-attention (CrossAttention, G_PARAMS):
+    # "g" (g itself, submitted models; configs without this field load with "g") or "tau" (similarity / τ, τ = 1/g)
+    g_param: str = "g"
 
     # CA2E specific parameters
     max_locations: Optional[int] = None

@@ -14,6 +14,7 @@ class CA2E(tf.keras.Model):
             similarity_metric: str,
             k: int = False,
             dropout: float = 0,
+            g_param: str = "g",
             name="CA2E",
             *args,
             **kwargs
@@ -27,6 +28,7 @@ class CA2E(tf.keras.Model):
         self.similarity_metric = similarity_metric
         self.k = k
         self.dropout = dropout
+        self.g_param = g_param
 
         # Encoder
         self.encoder = Encoder(
@@ -39,7 +41,8 @@ class CA2E(tf.keras.Model):
         )
 
         # Cross-Attention (g_zero_init is only applied for ["cosine_similarity", "pearson_correlation"])
-        self.cross_attention = CrossAttention(similarity_metric, g_zero_init=lookback-seq_len+1, name="cross_attention")
+        self.cross_attention = CrossAttention(similarity_metric, g_zero_init=lookback-seq_len+1, g_param=g_param,
+                                              name="cross_attention")
 
     def encode(self, inputs, training=None):
         """
@@ -93,6 +96,7 @@ class CA2E(tf.keras.Model):
             'similarity_metric': self.similarity_metric,
             'k': self.k,
             'dropout': self.dropout,
+            'g_param': self.g_param,
         })
         return config
 
