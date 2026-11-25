@@ -811,7 +811,7 @@ def plot_training_history(history: tf.keras.callbacks.History,
     """Plot and save training history."""
     fig, ax = plt.subplots(figsize=(12, 8))
     for metric, values in history.history.items():
-        if metric not in ("lr", "epoch_time"):
+        if metric not in ("lr", "learning_rate", "epoch_time"):  # learning rate: "lr" in Keras 2, "learning_rate" in Keras 3
             ax.plot(values, label=metric, alpha=0.7)
             min_val = min(values)
             epoch_min = values.index(min_val)

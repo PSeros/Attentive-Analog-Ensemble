@@ -178,7 +178,8 @@ def check_training(output_dir, model_type, name, location):
         return problems, ""
     record = json.loads(history.read_text())
     h = record["history"]
-    for key in ["loss", "val_loss", "ess", "val_ess", "g", "lr",
+    lr_key = "learning_rate" if "learning_rate" in h else "lr"  # Keras 3 / Keras 2
+    for key in ["loss", "val_loss", "ess", "val_ess", "g", lr_key,
                 "grad_share_outside_top100", "weight_share_outside_top100", "epoch_time"]:
         if len(h.get(key, [])) != EPOCHS:
             problems.append(f"history[{key}] has {len(h.get(key, []))} values")
