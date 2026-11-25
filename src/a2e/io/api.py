@@ -44,6 +44,9 @@ class Api:
         so that the result of one model does not depend on models trained before it in the same process.
         Op determinism is not enabled (runtime).
 
+        With `config.g_param = "tau"`, τ = 1/g of the cross-attention is excluded from the weight decay of the
+        optimizer (AdamW). With "g", g is trained as in the submitted models (with weight decay).
+
         After the final save, `<model_name>_history.json` is written next to the model (see `_save_history`).
         It is the marker for a finished training run. It contains the training time (TrainingTimer): seconds per
         epoch in `history.epoch_time`, the total in `training_time_s`, and the `device`.
@@ -104,6 +107,8 @@ class Api:
             self._create_new_model(optimizer, loss, metrics)
             self.config.best_epoch = None
             self.config.best_val_loss = None
+
+        self._exclude_g_from_weight_decay()
 
         print(self.model.summary())
 
@@ -346,6 +351,21 @@ class Api:
             metrics=metrics
         )
         print("Created new model.")
+
+    def _exclude_g_from_weight_decay(self) -> None:
+        """
+        No weight decay (AdamW) on τ = 1/g of the cross-attention (`config.g_param = "tau"`): weight decay is no
+        sensible regularization for a temperature, it would pull τ towards 0, i.e. g towards infinity.
+        With "g" nothing changes, so that the models train as the submitted ones.
+        Must run before the optimizer is built (first gradient step); replaces exclusions that were set on the
+        optimizer before.
+        """
+        attention = self.model.cross_attention
+        g_weight = getattr(attention, "g_weight", None)
+        optimizer = self.model.optimizer
+        if g_weight is None or attention.g_param != "tau" or not hasattr(optimizer, "exclude_from_weight_decay"):
+            return
+        optimizer.exclude_from_weight_decay(var_list=[g_weight])
 
     def _setup_callbacks(self, save_path: str, current_epoch: int,
                          callbacks: List[tf.keras.callbacks.Callback]) -> List[tf.keras.callbacks.Callback]:

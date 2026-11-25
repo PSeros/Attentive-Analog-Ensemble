@@ -13,6 +13,7 @@ class MiniA2E(BaseModel):
             similarity_metric: str,
             k: int = False,
             dropout: float = 0,
+            g_param: str = "g",
             name="MiniA2E",
             *args,
             **kwargs
@@ -25,6 +26,7 @@ class MiniA2E(BaseModel):
         self.similarity_metric = similarity_metric
         self.k = k
         self.dropout = dropout
+        self.g_param = g_param
 
         # Encoder
         self.encoder = tf.keras.layers.Conv1D(
@@ -34,7 +36,8 @@ class MiniA2E(BaseModel):
         )
 
         # Cross-Attention (g_zero_init is only applied for ["cosine_similarity", "pearson_correlation"])
-        self.cross_attention = CrossAttention(similarity_metric, g_zero_init=lookback-seq_len+1, name="cross_attention")
+        self.cross_attention = CrossAttention(similarity_metric, g_zero_init=lookback-seq_len+1, g_param=g_param,
+                                              name="cross_attention")
 
     def encode(self, inputs):
         """
@@ -84,6 +87,7 @@ class MiniA2E(BaseModel):
             'n_blocks': self.n_blocks,
             'similarity_metric': self.similarity_metric,
             'dropout': self.dropout,
+            'g_param': self.g_param,
         })
         return config
 

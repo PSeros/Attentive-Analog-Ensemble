@@ -88,7 +88,7 @@ class SpoilLastEpoch(tf.keras.callbacks.Callback):
             self.model.cross_attention.g.assign(1e4)
 
 
-def train(config, save_path, callbacks):
+def train(config, save_path, callbacks, learning_rate=0.01):
     x, y = synthetic_data()
     features, targets = a2e.io.build_features(x, y, config)
     api = a2e.io.Api(config=config)
@@ -99,7 +99,7 @@ def train(config, save_path, callbacks):
         epochs=EPOCHS,
         test_size=0.3,
         batch_size=16,
-        optimizer=tf.keras.optimizers.AdamW(learning_rate=0.01),
+        optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate),
         loss=a2e.loss.SCRPS(),
         metrics=[a2e.metrics.keras.CRPSMetric(), a2e.metrics.keras.EntropyMetric(), a2e.metrics.keras.ESSMetric()],
         callbacks=callbacks,

@@ -16,6 +16,7 @@ class SA2E(BaseModel):
             k: int = False,
             locations_kernel_size: int = 3,
             dropout: float = 0,
+            g_param: str = "g",
             name="SA2E",
             *args,
             **kwargs
@@ -30,6 +31,7 @@ class SA2E(BaseModel):
         self.k = k
         self.locations_kernel_size = locations_kernel_size
         self.dropout = dropout
+        self.g_param = g_param
 
         # Encoder
         self.encoder = SpatialEncoder(
@@ -44,7 +46,8 @@ class SA2E(BaseModel):
         )
 
         # Cross-Attention (g_zero_init is only applied for ["cosine_similarity", "pearson_correlation"])
-        self.cross_attention = CrossAttention(similarity_metric, g_zero_init=lookback-seq_len+1, name="cross_attention")
+        self.cross_attention = CrossAttention(similarity_metric, g_zero_init=lookback-seq_len+1, g_param=g_param,
+                                              name="cross_attention")
 
     def encode(self, inputs):
         """
@@ -96,6 +99,7 @@ class SA2E(BaseModel):
             'similarity_metric': self.similarity_metric,
             'locations_kernel_size': self.locations_kernel_size,
             'dropout': self.dropout,
+            'g_param': self.g_param,
         })
         return config
 
