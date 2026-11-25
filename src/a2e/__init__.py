@@ -3,6 +3,11 @@ Attentive Analog Ensemble (A2E):
 End-to-End learning of Analog Similarity by Optimizing
 Probabilistic Scoring Rules via Differentiable Retrieval.
 """
+import os
+# Non-interactive matplotlib backend for scripts: plt.show() no longer blocks (e.g. after each training run).
+# Has to be set before matplotlib is imported. Jupyter kernels set MPLBACKEND themselves and are not affected.
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 from a2e import metrics
 from a2e import io
 from a2e import callbacks
