@@ -40,7 +40,10 @@ class A2EPipeline(BaseTrainingPipeline):
 
         def extract_sample(i):
             i = tf.cast(i, tf.int32)
-            x_h = f_data[i: i + self.config.lookback]
+            # Archive: the forecasts are shifted by `foresight` against the values, so that the window ending in
+            # row r carries a_data[r - foresight], the value at its target time (same convention as y_t below).
+            fs = self.config.foresight
+            x_h = f_data[i + fs: i + self.config.lookback + fs]
             y_h = a_data[i: i + self.config.lookback]
 
             start = i + self.config.lookback + self.config.time_to_target - self.config.seq_len
