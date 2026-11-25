@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
@@ -19,6 +20,36 @@ class EpochTracker(Callback):
         if self.save_path:
             config_path = os.path.splitext(self.save_path)[0] + "_config.json"
             self.config.save_to_json(config_path)
+
+
+class TrainingTimer(Callback):
+    """
+    Wall-clock training time.
+
+    - `epoch_time` in the epoch logs (and thereby in the Keras History): seconds for training and validation of the
+      epoch. Runs first in on_epoch_end, so the TrainingMonitor probe and the checkpoint save are not included.
+    - `total` after training: seconds from on_train_begin to on_train_end, i.e. all epochs including all callbacks
+      (without building the model and the data pipeline, and without the final save).
+    """
+    def __init__(self):
+        super().__init__()
+        self.total = None
+        self._train_start = None
+        self._epoch_start = None
+
+    def on_train_begin(self, logs=None):
+        self._train_start = time.perf_counter()
+
+    def on_epoch_begin(self, epoch, logs=None):
+        self._epoch_start = time.perf_counter()
+
+    def on_epoch_end(self, epoch, logs=None):
+        if logs is not None and self._epoch_start is not None:
+            logs["epoch_time"] = time.perf_counter() - self._epoch_start
+
+    def on_train_end(self, logs=None):
+        if self._train_start is not None:
+            self.total = time.perf_counter() - self._train_start
 
 
 class BestWeights(Callback):

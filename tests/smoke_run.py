@@ -179,7 +179,7 @@ def check_training(output_dir, model_type, name, location):
     record = json.loads(history.read_text())
     h = record["history"]
     for key in ["loss", "val_loss", "ess", "val_ess", "g", "lr",
-                "grad_share_outside_top100", "weight_share_outside_top100"]:
+                "grad_share_outside_top100", "weight_share_outside_top100", "epoch_time"]:
         if len(h.get(key, [])) != EPOCHS:
             problems.append(f"history[{key}] has {len(h.get(key, []))} values")
     if ("euclidean" in name) != all(v is None for v in h.get("g", [])):

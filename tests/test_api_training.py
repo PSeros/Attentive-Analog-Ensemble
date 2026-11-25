@@ -3,7 +3,7 @@ Training through a2e.io.Api on a small synthetic data set.
 
 - The saved model has the weights of the epoch with the lowest val_loss, also without early stopping (F2).
 - Checkpointing is done only by the Api (F2).
-- History JSON with ESS, g and the gradient/weight share outside the top-k (F4).
+- History JSON with ESS, g and the gradient/weight share outside the top-k (F4), and the training time.
 - config.seed fixes the initial weights (F5).
 - Api.embed conditions the CA2E encoder on the location (F8).
 
@@ -147,7 +147,7 @@ class TestBestWeights(unittest.TestCase):
         with open(a2e.io.Api.history_path(self.save_path)) as f:
             record = json.load(f)
         for key in ["seed", "config", "initial_epoch", "epochs_trained", "best_epoch", "best_val_loss",
-                    "stopped_early", "probe", "history"]:
+                    "stopped_early", "training_time_s", "device", "probe", "history"]:
             self.assertIn(key, record)
         self.assertEqual(record["epochs_trained"], EPOCHS)
         self.assertEqual(record["best_epoch"], int(np.argmin(self.val_loss)) + 1)
@@ -155,8 +155,13 @@ class TestBestWeights(unittest.TestCase):
         self.assertEqual(record["config"]["seq_len"], self.config.seq_len)
         history = record["history"]
         grad_key, weight_key = f"grad_share_outside_top{TOP_K}", f"weight_share_outside_top{TOP_K}"
-        for key in ["loss", "val_loss", "crps", "val_crps", "entropy", "ess", "val_ess", "g", grad_key, weight_key]:
+        for key in ["loss", "val_loss", "crps", "val_crps", "entropy", "ess", "val_ess", "g", grad_key, weight_key,
+                    "epoch_time"]:
             self.assertEqual(len(history[key]), EPOCHS, key)
+        # Training time: per epoch (training + validation) and in total (all epochs with all callbacks)
+        self.assertTrue(all(t > 0 for t in history["epoch_time"]))
+        self.assertGreaterEqual(record["training_time_s"], sum(history["epoch_time"]))
+        self.assertTrue(record["device"])
         n_archive = self.config.lookback - self.config.seq_len + 1
         for value in history["ess"] + history["val_ess"]:
             self.assertTrue(1.0 <= value <= n_archive)
