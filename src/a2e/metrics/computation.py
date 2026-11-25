@@ -73,6 +73,30 @@ def compute_bias(x: tf.Tensor, w: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
     bias = tf.subtract(expected_values, y)
     return bias
 
+def compute_pit(x: tf.Tensor, w: tf.Tensor, y: tf.Tensor, u: tf.Tensor) -> tf.Tensor:
+    """
+    Randomized PIT of y under the weighted ensemble CDF F: F(y-) + u * (F(y) - F(y-)).
+
+    Parameters
+    ----------
+    x : Ensemble members, shape (n_samples, n_members)
+    w : Normalized member weights, shape (n_samples, n_members)
+    y : True values, shape (n_samples,)
+    u : Uniform random numbers in [0, 1), shape (n_samples,)
+
+    Returns
+    -------
+    tf.Tensor of shape (n_samples,)
+    """
+    x = tf.cast(x, tf.float32)
+    w = tf.cast(w, tf.float32)
+    y = tf.reshape(tf.cast(y, tf.float32), (-1, 1))
+    u = tf.reshape(tf.cast(u, tf.float32), (-1,))
+    below = tf.reduce_sum(w * tf.cast(x < y, tf.float32), axis=1)    # F(y-)
+    at_or_below = tf.reduce_sum(w * tf.cast(x <= y, tf.float32), axis=1)  # F(y)
+    # The float32 sum of normalized weights can exceed 1 by one ULP
+    return tf.clip_by_value(below + u * (at_or_below - below), 0.0, 1.0)
+
 def compute_rmse(x: tf.Tensor, w: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
     """
     Compute the RMSE between ensemble members and true values for each time step.

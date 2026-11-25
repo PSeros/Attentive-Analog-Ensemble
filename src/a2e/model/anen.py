@@ -11,6 +11,7 @@ class AnEn(tf.keras.Model):
                  n_analogs: int = 50,
                  temporal_window: int = 0,
                  learn_weights: bool = False,
+                 chunk_size: int = 256,
                  name: str = "AnEn",
                  **kwargs):
         """
@@ -20,6 +21,8 @@ class AnEn(tf.keras.Model):
             n_analogs: Number of analogs to select (k)
             temporal_window: Half-width of temporal window (tilde_t)
             learn_weights: Whether feature weights are trainable
+            chunk_size: Number of current windows per dissimilarity computation (memory ~ chunk_size * n_historical
+                * window_size * features); the result does not depend on it
             name: Model name
         """
         super().__init__(name=name, **kwargs)
@@ -27,6 +30,7 @@ class AnEn(tf.keras.Model):
         self.temporal_window = temporal_window
         self.window_size = 2 * temporal_window + 1
         self.learn_weights = learn_weights
+        self.chunk_size = chunk_size
 
         # Initialize adaptable weights
         self.feature_weights = None
@@ -176,13 +180,12 @@ class AnEn(tf.keras.Model):
             # Align historical observations
             y_h = y_h[self.temporal_window:-self.temporal_window]
 
-        # Compute dissimilarity matrix using the AnEn equation
-        dissimilarity = self.compute_dissimilarity_matrix(x_t, x_h)
-
-        # Select analogs
-        analog_ensemble = self.select_analogs(
-            dissimilarity, y_h
-        )
+        # Dissimilarity (AnEn equation) and analog selection, in chunks of current windows (rows are independent)
+        ensembles = []
+        for start in range(0, x_t.shape[0], self.chunk_size):
+            dissimilarity = self.compute_dissimilarity_matrix(x_t[start:start + self.chunk_size], x_h)
+            ensembles.append(self.select_analogs(dissimilarity, y_h))
+        analog_ensemble = tf.concat(ensembles, axis=0)
 
         # Squeeze last dim
         analog_ensemble = tf.squeeze(analog_ensemble, axis=-1)

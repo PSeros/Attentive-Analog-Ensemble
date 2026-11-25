@@ -73,7 +73,8 @@ def plot_rmse(
     ax: plt.Axes = None
 ) -> plt.Axes:
     """
-    Plot RMSE over time based on ensemble members and true values.
+    Plot the absolute error of the ensemble mean over time; the legend gives the RMSE of the ensemble mean,
+    sqrt(mean((sum_i w_i x_i - y)^2)).
 
     Args:
         y_true (tf.Tensor): True values, shape (n_samples,)
@@ -99,9 +100,10 @@ def plot_rmse(
     ensemble_observations = tf.cast(ensemble_observations, dtype=tf.float32)
     member_weights = tf.cast(member_weights, dtype=tf.float32)
 
-    # Compute RMSE values
-    rmse = compute_rmse(ensemble_observations, member_weights, y_true)
-    mean_rmse = tf.reduce_mean(rmse)
+    # Error of the ensemble mean per sample and RMSE of the ensemble mean
+    bias = compute_bias(ensemble_observations, member_weights, y_true)[:, 0]
+    rmse = tf.abs(bias)
+    mean_rmse = tf.sqrt(tf.reduce_mean(tf.square(bias)))
 
     if label:
         label = f"{label} (Mean: {mean_rmse:.4f})"
