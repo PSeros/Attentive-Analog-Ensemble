@@ -5,6 +5,7 @@ Training through a2e.io.Api on a small synthetic data set.
 - Checkpointing is done only by the Api (F2).
 - History JSON with ESS, g and the gradient/weight share outside the top-k (F4).
 - config.seed fixes the initial weights (F5).
+- Api.embed conditions the CA2E encoder on the location (F8).
 
 Run from the repository root:
     .venv/bin/python -m unittest tests.test_api_training -v
@@ -205,6 +206,33 @@ class TestBestWeights(unittest.TestCase):
             path = os.path.join(tmp, "m.keras")
             with self.assertRaises(ValueError):
                 train(make_config(), path, [tf.keras.callbacks.ModelCheckpoint(path)])
+
+
+class TestEmbedLocation(unittest.TestCase):
+
+    def make_api(self, **kwargs):
+        config = make_config(**kwargs)
+        config.forecast_normalizer_mean, config.forecast_normalizer_variance = [0.0, 0.0], [1.0, 1.0]
+        api = a2e.io.Api(config=config)
+        api.model = api.factory.build_model(optimizer="adam", loss=a2e.loss.SCRPS(), metrics=None)
+        return api
+
+    def test_ca2e_location(self):
+        tf.keras.utils.set_random_seed(0)
+        api = self.make_api(model_type="CA2E", max_locations=3)
+        features, _ = a2e.io.build_features(*synthetic_data(), api.config)
+        z = api.embed(features, verbose=False, location=2)
+        expected = api.model.encoder(tf.expand_dims(features, 0), loc=tf.constant([2]))[0]
+        np.testing.assert_allclose(z, expected, rtol=1e-6, atol=1e-6)
+        self.assertFalse(np.allclose(z, api.embed(features, verbose=False, location=0)))
+        with self.assertRaises(ValueError):
+            api.embed(features, verbose=False)
+
+    def test_a2e_rejects_location(self):
+        api = self.make_api()
+        features, _ = a2e.io.build_features(*synthetic_data(), api.config)
+        with self.assertRaises(ValueError):
+            api.embed(features, verbose=False, location=0)
 
 
 if __name__ == "__main__":

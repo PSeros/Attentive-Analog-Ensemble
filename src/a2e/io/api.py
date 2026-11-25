@@ -122,7 +122,8 @@ class Api:
     def embed(self, forecasts: tf.Tensor,
               model_path: str = None,
               config_path: str = None,
-              verbose: bool = True
+              verbose: bool = True,
+              location: int = None,
               ) -> tf.Tensor:
         """
         Api around the embedding network in trained models, transforming forecast sequences into embedding vectors.
@@ -132,6 +133,8 @@ class Api:
             model_path (str): Path to load a trained model from if no model is loaded (optional).
             config_path (str): Path to load a config from if no config is loaded (optional).
             verbose (bool): If False mutes print statements.
+            location (int): Location index for encoders with location embeddings (CA2E, required there). The
+                encoder is conditioned on it as in training.
 
         Returns:
             - embeddings (tf.Tensor): Embedded sequences with shape (batch, timesteps-seq_len+1, embedding dimension).
@@ -155,9 +158,18 @@ class Api:
             variance=self._normalizer_value(self.config.forecast_normalizer_variance)
         )(forecasts)
 
+        # Location conditioning (CA2E): the same location embedding as in training
+        loc = None
+        if getattr(self.model.encoder, "embedding", None) is not None:
+            if location is None:
+                raise ValueError(f"{self.model.name} uses location embeddings: pass `location` to embed().")
+            loc = tf.constant([location], dtype=tf.int32)
+        elif location is not None:
+            raise ValueError(f"{self.model.name} has no location embeddings; `location` must be None.")
+
         # Apply the encoder
         forecasts = tf.expand_dims(forecasts, 0) # (time, features) -> (1, time, features)
-        embeddings = self.model.encoder(forecasts) # (1, time, features) -> (1, time-seq_len+1, d_model)
+        embeddings = self.model.encoder(forecasts, loc=loc) # (1, time, features) -> (1, time-seq_len+1, d_model)
         return tf.squeeze(embeddings, axis=0) # (1, time-seq_len+1, d_model) -> (time-seq_len+1, d_model)
 
     def retrieve(
