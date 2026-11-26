@@ -1,5 +1,5 @@
 """
-Baselines for the review (M2): raw NWP forecast, persistence and persistence ensemble (PeEn).
+Baselines: raw NWP forecast, persistence and persistence ensemble (PeEn).
 
 Samples are identical to the A2E/AnEn evaluation (anen_metrics.py, a2e_metrics.py):
 validation targets y_t at the last `test_size` time steps before the final `foresight` step.

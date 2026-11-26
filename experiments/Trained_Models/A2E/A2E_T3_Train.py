@@ -1,5 +1,5 @@
 """
-A2E with a temporal window of T = 3 (ablation, review M2).
+A2E with a temporal window of T = 3 (ablation).
 
 Difference from A2E_Train.py: seq_len=3, n_blocks=2. One causal convolution (kernel 2, dilation 1) per block gives
 a receptive field of 1 + 2·(2^1 − 1) = 3: x_{t-1}, x_t, x_{t+1} and y_{t-4}, y_{t-3}, y_{t-2}, the window of AnEn

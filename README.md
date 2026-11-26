@@ -196,7 +196,7 @@ The framework supports evaluation with:
 - **SCRPS**
 - **RMSE**
 - **Bias**
-- **Rank histograms** for calibration analysis
+- **PIT histograms** of the weighted ensembles for calibration analysis
 
 These metrics allow assessment of both probabilistic forecast quality and deterministic point accuracy.
 

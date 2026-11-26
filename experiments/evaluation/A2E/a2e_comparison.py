@@ -1,5 +1,5 @@
 """
-A2E (cosine similarity) vs. AnEn per location: bias, RMSE, CRPS, SCRPS over time, rank histograms, Q-Q plots.
+A2E (cosine similarity) vs. AnEn per location: bias, RMSE, CRPS, SCRPS over time, PIT histograms, Q-Q plots.
 Saved in the _evaluation folder of the model.
 
 Run from the repository root:
